@@ -41,6 +41,7 @@ const base_url_images_cdn = "https://cdn.dsmcdn.com/";
          executablePath: executablePath(),
          ignoreDefaultArgs: ["--disable-extensions", "--enable-automation"],
          args: global_args,
+         devtools: true,
       });
       const pages = await browser.pages();
       const page = pages[0];
@@ -85,13 +86,34 @@ const base_url_images_cdn = "https://cdn.dsmcdn.com/";
  * @param {String} url
  */
 async function load_product_page(page, url) {
-   const data = {};
+   const data = {
+      variants: [],
+      price_code: "TL",
+      price: null,
+      title: null,
+      rating: null,
+      description: null,
+      recent_reviews: [],
+      properties: [],
+   };
+
    await page.setCookie(...cookies);
    await page.goto(url, {
       waitUntil: "networkidle2",
    });
 
    await remove_elements(page);
+
+   /**
+    * Extract product data
+    */
+
+   // Extract product images
+   // const image_sources = await page.evaluate(evaluate_extract_product_images);
+   // data.images.push(image_sources.flat());
+
+   const variations = await extract_product_attritubtes(page);
+   console.log(variations);
 
    return data;
 }
@@ -117,7 +139,7 @@ async function load_archive_page(page, url, limit = 200) {
    let previousHeight;
 
    while (links.flat().length < limit) {
-      const hrefs = await page.evaluate(extract_archive_hrefs);
+      const hrefs = await page.evaluate(evaluate_extract_archive_hrefs);
       links.push(hrefs.flat());
       previousHeight = await page.evaluate("document.body.scrollHeight");
       await page.evaluate(
@@ -130,7 +152,7 @@ async function load_archive_page(page, url, limit = 200) {
 }
 
 // Used to evaluate page hrefs
-function extract_archive_hrefs() {
+function evaluate_extract_archive_hrefs() {
    const tags = document.querySelectorAll(".p-card-wrppr a");
    const hrefs = [];
 
@@ -139,6 +161,61 @@ function extract_archive_hrefs() {
    });
 
    return hrefs;
+}
+
+function evaluate_extract_product_images() {
+   const image_elements = document.querySelectorAll(
+      ".gallery-container .product-slide img"
+   );
+   const image_sources = [];
+   Array.from(image_elements).forEach((element) => {
+      image_sources.push(element.src.replace("mnresize/128/192/", ""));
+   });
+
+   return image_sources;
+}
+
+async function extract_product_attritubtes(page) {
+   const selector = ".sp-itm";
+   await page.waitForSelector(selector);
+   const nodes = await page.$$(selector);
+   const attributes = [];
+
+   const attributes_wrappers = await page.$$(".slicing-attributes");
+
+   for (let index = 0; index < attributes_wrappers.length; index++) {
+      const attributes_wrapper = attributes_wrappers[index];
+
+      const attribute_links = await attributes_wrapper.$$eval("a", (links) =>
+         links.map((link) => link.innerHTML)
+      );
+
+      const attribute_title = await attributes_wrapper.$eval(
+         ".slc-title",
+         (title) => title.innerText.replaceAll(":", "").trim()
+      );
+
+      console.log([attribute_links, attribute_title]);
+
+      attributes[attribute_title] = {};
+
+      const variations = await page.evaluate(
+         evaluate_extract_product_variations
+      );
+
+      // attributes[attribute_title]["variations"] = variations;
+   }
+
+   nodes.forEach(async (node) => {
+      await node.click();
+   });
+
+   return attributes;
+}
+
+function evaluate_extract_product_variations() {
+   // ...
+   return [];
 }
 
 // Used to remove unnecessary elements in current page
@@ -164,6 +241,6 @@ async function remove_elements(page) {
          console.log("Removed elements");
       })
       .catch(() => {
-         console.log("couldn't find banner");
+         // console.log("couldn't find banner");
       });
 }
