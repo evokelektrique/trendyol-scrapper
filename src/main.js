@@ -1,20 +1,27 @@
 const fs = require("fs");
 const path = require("path");
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-const AdblockPlugin = require("puppeteer-extra-plugin-adblocker");
+// const puppeteer = require("puppeteer-extra");
+const puppeteer = require("puppeteer-core");
+// const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+// const AdblockPlugin = require("puppeteer-extra-plugin-adblocker");
 const global_args = require("./args.js");
 const cookies = require("./cookies.js");
 const constant = require("./constant.js");
+const dotenv = require("dotenv");
 
-puppeteer.use(StealthPlugin());
-puppeteer.use(AdblockPlugin());
+// get config vars
+dotenv.config();
+
+// puppeteer.use(StealthPlugin());
+// puppeteer.use(AdblockPlugin());
 
 const { executablePath } = require("puppeteer");
 
 const plugin_path = path.resolve("./plugin/js/config_ac_api_key.js"); // Convert relative to absolute path
 // Set api key
-const apiKey = "88d870b538df2079d9660fe97f8686c1";
+const apiKey = process.env.RECAPTCHA_API;
+
+console.log(apiKey);
 if (fs.existsSync(plugin_path)) {
    let confData = fs.readFileSync(plugin_path, "utf8");
    confData = confData.replace(
@@ -37,50 +44,55 @@ const base_url_images_cdn = "https://cdn.dsmcdn.com/";
 (async () => {
    // Init browser
    try {
-      const browser = await puppeteer.launch({
+      const browser = await puppeteer.connect({
          headless: false,
-         executablePath: executablePath(),
+         // executablePath: executablePath(),
+         browserWSEndpoint:
+            process.env.BROWSERLESS_URL + process.env.BROWSERLESS_API,
          ignoreDefaultArgs: ["--disable-extensions", "--enable-automation"],
          args: global_args,
          devtools: true,
       });
-      const pages = await browser.pages();
-      const page = pages[0];
 
-      // /**
-      //  * Extract links
-      //  */
-      // const limit = 200;
-      // let extracted_links = [];
+      const page = await browser.newPage();
 
-      // for (let i = 0; i < urls.length; i++) {
-      //    const url = urls[i];
-      //    const links = await load_archive_page(page, url, limit);
-      //    extracted_links.push(links);
-      // }
-      // extracted_links = extracted_links.flat(Infinity);
-      // console.log(extracted_links, extracted_links.length);
+      /**
+       * Extract links
+       */
+      const limit = 200;
+      let extracted_links = [];
 
-      // /**
-      //  * Extract product
-      //  */
-      // for (let i = 0; i < extracted_links.length; i++) {
-      //    const url = base_url + extracted_links[i];
+      for (let i = 0; i < urls.length; i++) {
+         const url = urls[i];
+         const links = await load_archive_page(page, url, limit);
+         console.log("links", links);
+         extracted_links.push(links);
+      }
+      extracted_links = extracted_links.flat(Infinity);
+      console.log(extracted_links, extracted_links.length);
 
-      //    const product = await load_product_page(page, url);
-      //    console.log(product);
-      // }
-      const url =
-         "https://www.trendyol.com/trendyolmilla/siyah-100-pamuk-vatka-gorunumlu-basic-bisiklet-yaka-orme-t-shirt-twoss20ts0021-p-35503713?boutiqueId=621840&merchantId=968";
+      /**
+       * Extract product
+       */
+      for (let i = 0; i < extracted_links.length; i++) {
+         const url = base_url + extracted_links[i];
+
+         const product = await load_product_page(page, url);
+         console.log(product);
+      }
+      // const url =
+      // "https://www.trendyol.com/trendyolmilla/siyah-100-pamuk-vatka-gorunumlu-basic-bisiklet-yaka-orme-t-shirt-twoss20ts0021-p-35503713?boutiqueId=621840&merchantId=968";
 
       // const url =
-         // "https://www.trendyol.com/tommy-hilfiger/th-modern-leather-mini-cc-wallet-p-667372882?boutiqueId=61&merchantId=423224";
+      // "https://www.trendyol.com/tommy-hilfiger/th-modern-leather-mini-cc-wallet-p-667372882?boutiqueId=61&merchantId=423224";
 
       // const url =
       //    "https://www.trendyol.com/kigili/erkek-lacivert-polo-yaka-regular-fit-nakisli-tisort-p-713053844";
 
-      const product = await load_product_page(page, url);
-      console.log(product);
+      // const product = await load_product_page(page, url);
+      // console.log(product);
+
+      await page.close();
    } catch (e) {
       console.log(e);
    }
@@ -113,7 +125,9 @@ async function load_product_page(page, url) {
    });
 
    // Remove unnecessary elements form current page
-   await remove_elements(page);
+   try {
+      await remove_elements(page);
+   } catch (e) {}
 
    /**
     * Extract product data
@@ -132,7 +146,7 @@ async function load_product_page(page, url) {
    );
    data.description = description;
 
-   const properties = await page.evaluate(evaluate_extract_product_properties)
+   const properties = await page.evaluate(evaluate_extract_product_properties);
    data.properties = properties;
 
    // Get product type, It's either SIMPLE or VARIANT
@@ -172,7 +186,9 @@ async function load_archive_page(page, url, limit = 200) {
       waitUntil: "networkidle2",
    });
 
-   await remove_elements(page);
+   try {
+      await remove_elements(page);
+   } catch (e) {}
 
    // Extract links
    const links = [];
@@ -225,7 +241,7 @@ function evaluate_extract_product_properties() {
       const key = elements[0].innerText.trim().toLowerCase();
       const value = elements[1].innerText.trim().toLowerCase();
 
-      properties[key] = value
+      properties[key] = value;
    });
 
    return properties;
@@ -478,6 +494,7 @@ async function remove_elements(page) {
 
       removable_elements_selectors.forEach((selector) => {
          const element = document.querySelector(selector);
+
          if (element) {
             element.remove();
          }
@@ -488,8 +505,11 @@ async function remove_elements(page) {
 
    await page.evaluate(() => {
       const attribute_sliders = document.querySelectorAll(".attributeSlider *");
+
       Array.from(attribute_sliders).forEach((slider) => {
-         slider.style.overflow = "visible";
+         if (attribute_sliders) {
+            slider.style.overflow = "visible";
+         }
       });
    });
 }
