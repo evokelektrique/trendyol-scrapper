@@ -120,12 +120,10 @@ app.post(
       if(!req.body.url) {
          throw createError(422, "url not defined");
       }
-      console.log(req.body);
       
       const page = await Crawler.launch_browser();
       const product = await Crawler.load_product_page(page, req.body.url);
       await page.close();
-      console.log(product);
 
       res.json({
          status: "success",
