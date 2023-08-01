@@ -18,7 +18,7 @@ module.exports = {
 
    currency: {
       tr: {
-         code: "TL",
+         code: "try",
          i18n: {
             fa: "لیر ترکیه",
             en: "turkish lire",

@@ -11,6 +11,7 @@ require("express-async-errors"); // Async error handler
 const createError = require("http-errors"); // Error handling
 const app = express();
 const server_port = process.env.SERVER_PORT;
+const server_host = process.env.SERVER_HOST;
 
 // File system
 const fs = require("fs");
@@ -119,7 +120,8 @@ app.post(
       if(!req.body.url) {
          throw createError(422, "url not defined");
       }
-
+      console.log(req.body);
+      
       const page = await Crawler.launch_browser();
       const product = await Crawler.load_product_page(page, req.body.url);
       await page.close();
@@ -135,9 +137,9 @@ app.post(
 );
 
 // Error handling middleware
-app.use(middleware_errors);
+// app.use(middleware_errors);
 
 // Start the server
-app.listen(server_port, () => {
+app.listen(server_port, server_host, () => {
    console.log(`App is listening on port ${server_port}`);
 });

@@ -42,7 +42,7 @@ class Crawler {
          brand: null,
          description: null,
          price: null,
-         price_code: constant.currency.tr.code,
+         currency_code: constant.currency.tr.code,
          variations: [],
          recent_reviews: [],
          properties: [],
