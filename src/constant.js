@@ -1,8 +1,8 @@
 module.exports = {
    i18n: {
       beden: {
-         fa: "اندازه ها",
-         en: "sizes",
+         fa: "اندازه",
+         en: "size",
       },
 
       renk: {

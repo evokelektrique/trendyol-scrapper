@@ -184,7 +184,7 @@ class Crawler {
             const link_title = await link_title_property
                .toString()
                .replace("JSHandle:", "");
-            attributes[constant.i18n[title].en] = link_title;
+            attributes[title] = link_title;
 
             // Check if attribute sizes is available
             const is_attribute_available_size = await page.evaluate(
@@ -195,7 +195,7 @@ class Crawler {
                const attributes_sizes = await page.evaluate(
                   Evaluate.evaluate_extract_product_size_variants
                );
-               attributes[constant.i18n[attributes_sizes.title].en] =
+               attributes[attributes_sizes.title] =
                   attributes_sizes.data;
             }
 
