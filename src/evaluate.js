@@ -89,6 +89,7 @@ class Evaluate {
          featured: null,
       };
    }
+   
    /**
     * Check if attribute size is available in current product page
     *
@@ -125,7 +126,7 @@ class Evaluate {
     * @returns {string} Product title
     */
    static evaluate_extract_product_title() {
-      const title = document.querySelector(".pr-new-br span");
+      const title = document.querySelector(".pr-new-br");
 
       if (!title) {
          return false;
@@ -161,8 +162,10 @@ class Evaluate {
     * @returns {string} Product brand
     */
    static evaluate_extract_product_brand() {
-      const brand = document.querySelector(".pr-new-br a");
-
+      const brand_span = document.querySelector(".pr-new-br > span");
+      const brand_a = document.querySelector(".pr-new-br > a");
+      const brand = brand_span || brand_a;
+      
       if (!brand) {
          return false;
       }
