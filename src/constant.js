@@ -12,8 +12,8 @@ module.exports = {
    },
 
    product_type: {
-      variant: "VARIANT",
-      simple: "SIMPLE",
+      variable: "variable",
+      simple: "simple",
    },
 
    currency: {
