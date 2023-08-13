@@ -99,7 +99,7 @@ class Crawler {
       data.type = type;
 
       switch (type) {
-         case constant.product_type.variant:
+         case constant.product_type.variable:
             // Extract product variations and its prices
             const variations = await this.extract_product_variations(page);
             data.variations = variations;
@@ -195,8 +195,7 @@ class Crawler {
                const attributes_sizes = await page.evaluate(
                   Evaluate.evaluate_extract_product_size_variants
                );
-               attributes[attributes_sizes.title] =
-                  attributes_sizes.data;
+               attributes[attributes_sizes.title] = attributes_sizes.data;
             }
 
             const images = await page.evaluate(
@@ -227,11 +226,20 @@ class Crawler {
       const element = await page.$(".slicing-attributes");
       const element_content = await element.evaluate((e) => e.innerText);
 
-      if (!element || element_content === "") {
+      const other_attributes = await page.$('[class*="-variant-wrapper"]');
+      const other_attributes_content = await other_attributes.evaluate(
+         (e) => e.innerText
+      );
+
+      if (
+         !element ||
+         (element_content === "" && !other_attributes) ||
+         other_attributes_content === ""
+      ) {
          return constant.product_type.simple;
       }
 
-      return constant.product_type.variant;
+      return constant.product_type.variable;
    }
 
    static async extract_product_attritubtes(page) {
@@ -240,10 +248,20 @@ class Crawler {
          attribute_titles: [],
       };
 
-      const attributes_wrappers = await page.$$(".slicing-attributes");
+      const wrapper = await page.$(".container-right-content");
+      const attributes_wrappers = await wrapper.$$(".slicing-attributes");
+      const other_attributes = await wrapper.$$('[class*="-variant-wrapper"]');
 
       for (let index = 0; index < attributes_wrappers.length; index++) {
          const attributes_wrapper = attributes_wrappers[index];
+
+         const attributes_wrapper_content = await attributes_wrapper.evaluate(
+            (e) => e.innerText
+         );
+
+         if (attributes_wrapper_content === "") {
+            continue;
+         }
 
          // Extract variation links
          const attribute_links = await attributes_wrapper.$$("a");
@@ -258,7 +276,29 @@ class Crawler {
          data.attributes[attribute_title] = attribute_links;
       }
 
-      console.log('attributes data', data);
+      for (let index = 0; index < other_attributes.length; index++) {
+         const other_attribute = other_attributes[index];
+
+         const other_attribute_content = await other_attribute.evaluate(
+            (e) => e.innerText
+         );
+
+         if (other_attribute_content === "") {
+            continue;
+         }
+
+         // Extract variation links
+         const attribute_links = await other_attribute.$$(".sp-itm:not(.so)");
+
+         // Extract title
+         const attribute_title = await other_attribute.$eval(
+            "[class*='-variant-title--bold']",
+            (title) => title.innerText.replaceAll(":", "").trim().toLowerCase()
+         );
+
+         data.attribute_titles.push(attribute_title);
+         data.attributes[attribute_title] = attribute_links;
+      }
 
       return data;
    }
