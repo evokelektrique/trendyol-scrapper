@@ -89,7 +89,7 @@ class Evaluate {
          featured: null,
       };
    }
-   
+
    /**
     * Check if attribute size is available in current product page
     *
@@ -155,7 +155,7 @@ class Evaluate {
          data: sizes,
       };
    }
-   
+
    /**
     * Evaluate and extract current product brand form details container
     *
@@ -165,7 +165,7 @@ class Evaluate {
       const brand_span = document.querySelector(".pr-new-br > span");
       const brand_a = document.querySelector(".pr-new-br > a");
       const brand = brand_span || brand_a;
-      
+
       if (!brand) {
          return false;
       }
@@ -179,6 +179,8 @@ class Evaluate {
       Array.from(attribute_sliders).forEach((slider) => {
          if (attribute_sliders) {
             slider.style.overflow = "visible";
+            slider.style.zIndex = 9999999;
+            slider.style.position = 'relative';
          }
       });
    }
