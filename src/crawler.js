@@ -2,6 +2,7 @@ const Evaluate = require("./evaluate.js");
 const cookies = require("./cookies.js");
 const constant = require("./constant.js");
 const global_args = require("./args.js");
+const { executablePath } = require("puppeteer");
 
 // Puppeteer
 const puppeteer = require("puppeteer-core");
@@ -13,15 +14,27 @@ class Crawler {
     * @returns {Object} Browser new page instance
     */
    static async launch_browser() {
-      const browser = await puppeteer.connect({
-         // executablePath: executablePath(),
-         headless: false,
-         browserWSEndpoint:
-            process.env.BROWSERLESS_URL + process.env.BROWSERLESS_API,
-         ignoreDefaultArgs: ["--disable-extensions", "--enable-automation"],
-         args: global_args,
-         devtools: false,
-      });
+      let browser = null;
+
+      if (process.env.APP_ENV === "production") {
+         browser = await puppeteer.connect({
+            // executablePath: executablePath(),
+            headless: false,
+            browserWSEndpoint:
+               process.env.BROWSERLESS_URL + process.env.BROWSERLESS_API,
+            ignoreDefaultArgs: ["--disable-extensions", "--enable-automation"],
+            args: global_args,
+            devtools: false,
+         });
+      } else {
+         browser = await puppeteer.launch({
+            args: global_args,
+            ignoreDefaultArgs: ["--disable-extensions", "--enable-automation"],
+            executablePath: executablePath(),
+            headless: false,
+            devtools: true,
+         });
+      }
 
       const page = await browser.newPage();
 
@@ -175,9 +188,15 @@ class Crawler {
          for (let index = 0; index < attribute_links.length; index++) {
             const link = attribute_links[index];
             const attributes = {};
-            // click on variation to fetch new data and new price and wait for 2 seconds
-            await link.click();
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            // click on variation to fetch new data and new price and wait for 4 seconds
+            try {
+               await link.click();
+            } catch (e) {
+               console.log("Skipping error: " + e);
+               continue;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 4000));
 
             // Current product attribute title
             const link_title_property = await link.getProperty("title");
@@ -224,12 +243,18 @@ class Crawler {
    static async get_product_type(page) {
       // Extract title
       const element = await page.$(".slicing-attributes");
-      const element_content = await element.evaluate((e) => e.innerText);
+      let element_content = "";
+      if (element) {
+         element_content = await element.evaluate((e) => e.innerText);
+      }
 
       const other_attributes = await page.$('[class*="-variant-wrapper"]');
-      const other_attributes_content = await other_attributes.evaluate(
-         (e) => e.innerText
-      );
+      let other_attributes_content = "";
+      if (other_attributes) {
+         other_attributes_content = await other_attributes.evaluate(
+            (e) => e.innerText
+         );
+      }
 
       if (
          !element ||
