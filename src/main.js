@@ -1,7 +1,7 @@
 // Load environment files
 const dotenv = require("dotenv");
 dotenv.config();
-
+// const tracer = require("./tracer")("node_trendyol_scrapper");
 const Crawler = require("./crawler.js");
 
 // Express
@@ -79,7 +79,7 @@ app.post(
       }
       
       const page = await Crawler.launch_browser();
-      const base_url = "https://www.trendyol.com";
+      // const base_url = "https://www.trendyol.com";
       const urls = req.body.urls;
       
       /**
@@ -96,18 +96,25 @@ app.post(
       // Flatten links array
       extracted_links = extracted_links.flat(Infinity);
 
-      /**
-       * Extract product
-       */
-      for (let i = 0; i < extracted_links.length; i++) {
-         const url = base_url + extracted_links[i];
+      // /**
+      //  * Extract product
+      //  */
+      // for (let i = 0; i < extracted_links.length; i++) {
+      //    const url = base_url + extracted_links[i];
 
-         const product = await Crawler.load_product_page(page, url);
-         console.log(product);
-      }
+      //    const product = await Crawler.load_product_page(page, url);
+      //    console.log(product);
+      // }
 
       // Close current page when the process is finished
       await page.close();
+
+      res.json({
+         status: "success",
+         data: {
+            links: extracted_links
+         },
+      });
    })
 );
 
