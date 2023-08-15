@@ -54,23 +54,11 @@ class Evaluate {
          regular_price = is_featured_price.querySelector(".prc-org");
          if (regular_price) {
             regular_price = regular_price.innerText
-            // .replace("TL", "").trim();
-            // regular_price = regular_price.innerText
-            //    .replace("TL", "")
-            //    .replace(",", ".")
-            //    .replace(".", "")
-            //    .trim();
          }
 
          featured_price = is_featured_price.querySelector(".prc-dsc");
          if (featured_price) {
             featured_price = featured_price.innerText
-            // .replace("TL", "").trim();
-            // featured_price = featured_price.innerText
-            //    .replace("TL", "")
-            //    .replace(",", ".")
-            //    .replace(".", "")
-            //    .trim();
          }
 
          return {
@@ -82,15 +70,11 @@ class Evaluate {
       regular_price = wrapper.querySelector(".product-price-container");
       if (regular_price) {
          regular_price = regular_price.innerText
-            // .replace("TL", "")
-            // .replace(",", ".")
-            // .replace(".", "")
-            // .trim();
       }
 
       return {
          regular: regular_price,
-         featured: null,
+         featured: null, // It's always empty, because we don't calculate the featured price right now
       };
    }
 

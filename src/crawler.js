@@ -124,7 +124,15 @@ class Crawler {
                Evaluate.evaluate_extract_product_price
             );
             if (parseCurrency(price.regular)) {
-               data.price = parseCurrency(price.regular).value;
+               data.price = price;
+               if (parseCurrency(data.price.regular)) {
+                  data.price.regular = parseCurrency(data.price.regular).value;
+               }
+               if (parseCurrency(data.price.featured)) {
+                  data.price.featured = parseCurrency(
+                     data.price.featured
+                  ).value;
+               }
             }
             break;
 
