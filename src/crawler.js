@@ -3,6 +3,7 @@ const cookies = require("./cookies.js");
 const constant = require("./constant.js");
 const global_args = require("./args.js");
 const { executablePath } = require("puppeteer");
+const parseCurrency = require("parsecurrency");
 
 // Puppeteer
 const puppeteer = require("puppeteer-core");
@@ -122,7 +123,9 @@ class Crawler {
             const price = await page.evaluate(
                Evaluate.evaluate_extract_product_price
             );
-            data.price = price;
+            if (parseCurrency(price.regular)) {
+               data.price = parseCurrency(price.regular).value;
+            }
             break;
 
          default:
@@ -220,9 +223,17 @@ class Crawler {
             const images = await page.evaluate(
                Evaluate.evaluate_extract_product_images
             );
+
+            // Fetch and parse prices
             const price = await page.evaluate(
                Evaluate.evaluate_extract_product_price
             );
+            if (parseCurrency(price.regular)) {
+               price.regular = parseCurrency(price.regular).value;
+            }
+            if (parseCurrency(price.featured)) {
+               price.featured = parseCurrency(price.featured).value;
+            }
 
             variations.push({
                attributes: attributes,

@@ -54,19 +54,23 @@ class Evaluate {
          regular_price = is_featured_price.querySelector(".prc-org");
          if (regular_price) {
             regular_price = regular_price.innerText
-               .replace("TL", "")
-               .replace(",", ".")
-               .replace(".", "")
-               .trim();
+            // .replace("TL", "").trim();
+            // regular_price = regular_price.innerText
+            //    .replace("TL", "")
+            //    .replace(",", ".")
+            //    .replace(".", "")
+            //    .trim();
          }
 
          featured_price = is_featured_price.querySelector(".prc-dsc");
          if (featured_price) {
             featured_price = featured_price.innerText
-               .replace("TL", "")
-               .replace(",", ".")
-               .replace(".", "")
-               .trim();
+            // .replace("TL", "").trim();
+            // featured_price = featured_price.innerText
+            //    .replace("TL", "")
+            //    .replace(",", ".")
+            //    .replace(".", "")
+            //    .trim();
          }
 
          return {
@@ -78,10 +82,10 @@ class Evaluate {
       regular_price = wrapper.querySelector(".product-price-container");
       if (regular_price) {
          regular_price = regular_price.innerText
-            .replace("TL", "")
-            .replace(",", ".")
-            .replace(".", "")
-            .trim();
+            // .replace("TL", "")
+            // .replace(",", ".")
+            // .replace(".", "")
+            // .trim();
       }
 
       return {
@@ -189,6 +193,7 @@ class Evaluate {
       const removable_elements_selectors = [
          "#onetrust-consent-sdk",
          "#gender-popup-modal",
+         ".onboarding"
       ];
 
       removable_elements_selectors.forEach((selector) => {
