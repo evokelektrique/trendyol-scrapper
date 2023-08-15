@@ -53,7 +53,7 @@ const middleware_authenthication = function (req, res, next) {
  */
 const middleware_errors = function (error, req, res, next) {
    // Sets HTTP status code
-   res.status(error.status);
+   res.status(500);
 
    // Sends response
    res.json({
@@ -72,7 +72,7 @@ app.use(middleware_authenthication);
  * /extract_archive
  */
 app.post(
-   "/extract_archive",
+   "/extract_archive_links",
    asyncHandler(async (req, res, next) => {
       if(!req.body.urls) {
          throw createError(422, "urls not defined");
@@ -142,7 +142,7 @@ app.post(
 );
 
 // Error handling middleware
-// app.use(middleware_errors);
+app.use(middleware_errors);
 
 // Start the server
 app.listen(server_port, server_host, () => {
