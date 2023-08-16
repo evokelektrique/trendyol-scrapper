@@ -1,4 +1,6 @@
 module.exports = {
+   source: 'trendyol',
+   
    i18n: {
       beden: {
          fa: "اندازه",

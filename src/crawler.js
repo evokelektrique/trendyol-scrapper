@@ -51,6 +51,7 @@ class Crawler {
    static async load_product_page(page, url) {
       // Initial product data structure
       const data = {
+         source: constant.source,
          type: null,
          title: null,
          brand: null,
@@ -199,9 +200,16 @@ class Crawler {
          for (let index = 0; index < attribute_links.length; index++) {
             const link = attribute_links[index];
             const attributes = {};
+            const link_class_names = (
+               await link.getProperty("className")
+            ).toString();
+
             // click on variation to fetch new data and new price and wait for 4 seconds
             try {
-               await link.click();
+               // Do not click on selected attributes, because it changes the current page and interrupts the navigation
+               if (!link_class_names.includes("selected")) {
+                  await link.click();
+               }
             } catch (e) {
                console.log("Skipping error: " + e);
                continue;
@@ -276,8 +284,9 @@ class Crawler {
       }
 
       if (
-         !element ||
-         (element_content === "" && !other_attributes) ||
+         !element &&
+         element_content === "" &&
+         !other_attributes &&
          other_attributes_content === ""
       ) {
          return constant.product_type.simple;
@@ -293,9 +302,9 @@ class Crawler {
       };
 
       const wrapper = await page.$(".container-right-content");
-      const attributes_wrappers = await wrapper.$$(".slicing-attributes");
+      const attributes_wrappers = await wrapper.$$(".slicing-attributes section");
       const other_attributes = await wrapper.$$('[class*="-variant-wrapper"]');
-
+      
       for (let index = 0; index < attributes_wrappers.length; index++) {
          const attributes_wrapper = attributes_wrappers[index];
 
