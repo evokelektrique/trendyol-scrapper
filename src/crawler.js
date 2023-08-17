@@ -7,6 +7,7 @@ const parseCurrency = require("parsecurrency");
 
 // Puppeteer
 const puppeteer = require("puppeteer-core");
+const logger = require("./logger.js");
 
 class Crawler {
    /**
@@ -37,6 +38,8 @@ class Crawler {
          });
       }
 
+      logger.info(`Browser launched in (${process.env.APP_ENV}) environment`);
+
       const page = await browser.newPage();
 
       return page;
@@ -64,6 +67,8 @@ class Crawler {
          images: [],
       };
 
+      logger.info('Opening ' + url);
+
       // Set TR cookies
       await page.setCookie(...cookies);
       await page.goto(url, {
@@ -84,47 +89,55 @@ class Crawler {
          Evaluate.evaluate_extract_product_title
       );
       data.title = title;
+      logger.debug('Extracted product title ' + title);
+
 
       // Extract product brand
       const brand = await page.evaluate(
          Evaluate.evaluate_extract_product_brand
       );
       data.brand = brand;
+      logger.debug('Extracted product brand ' + brand);
 
       // Extract description
       const description = await page.evaluate(
          Evaluate.evaluate_extract_product_description
       );
       data.description = description;
+      logger.debug('Extracted product description ' + description);
 
       // Extract images
       const images = await page.evaluate(
          Evaluate.evaluate_extract_product_images
       );
       data.images = images;
+      logger.debug('Extracted product images ' + images.length + " total");
 
       // Extract extra attributes
       const properties = await page.evaluate(
          Evaluate.evaluate_extract_product_properties
       );
       data.properties = properties;
+      logger.debug('Extracted product properties ' + properties.length + " total");
 
       // Get product type, It's either SIMPLE or VARIANT
       const type = await this.get_product_type(page);
       data.type = type;
+      logger.debug('Extracted product type ' + type);
 
       switch (type) {
          case constant.product_type.variable:
             // Extract product variations and its prices
             const variations = await this.extract_product_variations(page);
             data.variations = variations;
+            logger.debug('Extracted product variations ' + variations.length + " total");
             break;
 
          case constant.product_type.simple:
             const price = await page.evaluate(
                Evaluate.evaluate_extract_product_price
             );
-            if (parseCurrency(price.regular)) {
+            if (parseCurrency(price.regular) || parseCurrency(price.featured)) {
                data.price = price;
                if (parseCurrency(data.price.regular)) {
                   data.price.regular = parseCurrency(data.price.regular).value;
@@ -135,6 +148,7 @@ class Crawler {
                   ).value;
                }
             }
+            logger.debug(`Extracted product prices (regular: ${data.price.regular}) - (featured: ${data.price.featured})`);
             break;
 
          default:
@@ -153,6 +167,8 @@ class Crawler {
     * @returns Array of string links
     */
    static async load_archive_page(page, url, limit = 200) {
+      logger.debug(`Loading archive page (${url}) with limit of (${limit})`);
+      
       await page.setCookie(...cookies);
       await page.goto(url, {
          waitUntil: "networkidle2",
@@ -177,6 +193,8 @@ class Crawler {
          );
          await page.waitForTimeout(2000);
       }
+
+      logger.debug(`Extracted links (${links.length}) total`);
 
       return links;
    }
@@ -208,10 +226,12 @@ class Crawler {
             try {
                // Do not click on selected attributes, because it changes the current page and interrupts the navigation
                if (!link_class_names.includes("selected")) {
+                  logger.debug(`Skipping attribute link with title (${await link.getProperty('title')}), because it contains (${link_class_names}) class names`)
+                  
                   await link.click();
                }
             } catch (e) {
-               console.log("Skipping error: " + e);
+               logger.error(`Skipped error: ${e}`)
                continue;
             }
 
@@ -258,6 +278,8 @@ class Crawler {
             });
          }
       }
+      
+      logger.debug(`Extracted variations (${JSON.stringify(variations)})`);
 
       return variations;
    }
@@ -353,11 +375,15 @@ class Crawler {
          data.attributes[attribute_title] = attribute_links;
       }
 
+      logger.debug(`Extracted attributes (${JSON.stringify(data)})`);
+
       return data;
    }
 
    // Used to remove unnecessary elements in current page
    static async remove_elements(page) {
+      logger.debug(`Removing elements of url (${await page.url()})`);
+
       // Browserless removes this
       // await page.waitForSelector("#onetrust-consent-sdk", {
       //    timeout: 30000,

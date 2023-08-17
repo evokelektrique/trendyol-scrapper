@@ -17,6 +17,9 @@ const server_host = process.env.SERVER_HOST;
 const fs = require("fs");
 const path = require("path");
 
+// Logger
+const logger = require('./logger');
+
 /**
  * Recaptcha solver configuration, replacing API
  */
@@ -108,13 +111,16 @@ app.post(
 
       // Close current page when the process is finished
       await page.close();
+      logger.info("Browser closed");
 
-      res.json({
+      const data = {
          status: "success",
          data: {
             links: extracted_links
          },
-      });
+      };
+      logger.debug(`Send response (${JSON.stringify(data)})`);
+      res.json(data);
    })
 );
 
@@ -131,13 +137,17 @@ app.post(
       const page = await Crawler.launch_browser();
       const product = await Crawler.load_product_page(page, req.body.url);
       await page.close();
-
-      res.json({
+      logger.info("Browser closed");
+      
+      const data = {
          status: "success",
          data: {
             product: product
          },
-      });
+      };
+
+      logger.debug(`Send response (${JSON.stringify(data)})`);
+      res.json(data);
    })
 );
 
