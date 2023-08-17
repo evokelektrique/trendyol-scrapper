@@ -67,7 +67,7 @@ class Crawler {
          images: [],
       };
 
-      logger.info('Opening ' + url);
+      logger.info("Opening " + url);
 
       // Set TR cookies
       await page.setCookie(...cookies);
@@ -89,48 +89,51 @@ class Crawler {
          Evaluate.evaluate_extract_product_title
       );
       data.title = title;
-      logger.debug('Extracted product title ' + title);
-
+      logger.debug("Extracted product title " + title);
 
       // Extract product brand
       const brand = await page.evaluate(
          Evaluate.evaluate_extract_product_brand
       );
       data.brand = brand;
-      logger.debug('Extracted product brand ' + brand);
+      logger.debug("Extracted product brand " + brand);
 
       // Extract description
       const description = await page.evaluate(
          Evaluate.evaluate_extract_product_description
       );
       data.description = description;
-      logger.debug('Extracted product description ' + description);
+      logger.debug("Extracted product description " + description);
 
       // Extract images
       const images = await page.evaluate(
          Evaluate.evaluate_extract_product_images
       );
       data.images = images;
-      logger.debug('Extracted product images ' + images.length + " total");
+      logger.debug("Extracted product images " + images.length + " total");
 
       // Extract extra attributes
       const properties = await page.evaluate(
          Evaluate.evaluate_extract_product_properties
       );
       data.properties = properties;
-      logger.debug('Extracted product properties ' + properties.length + " total");
+      logger.debug(
+         "Extracted product properties " + properties.length + " total"
+      );
 
       // Get product type, It's either SIMPLE or VARIANT
       const type = await this.get_product_type(page);
       data.type = type;
-      logger.debug('Extracted product type ' + type);
+      logger.debug("Extracted product type " + type);
 
       switch (type) {
          case constant.product_type.variable:
             // Extract product variations and its prices
             const variations = await this.extract_product_variations(page);
             data.variations = variations;
-            logger.debug('Extracted product variations ' + variations.length + " total");
+            logger.debug(
+               "Extracted product variations " + variations.length + " total"
+            );
             break;
 
          case constant.product_type.simple:
@@ -148,7 +151,9 @@ class Crawler {
                   ).value;
                }
             }
-            logger.debug(`Extracted product prices (regular: ${data.price.regular}) - (featured: ${data.price.featured})`);
+            logger.debug(
+               `Extracted product prices (regular: ${data.price.regular}) - (featured: ${data.price.featured})`
+            );
             break;
 
          default:
@@ -168,7 +173,7 @@ class Crawler {
     */
    static async load_archive_page(page, url, limit = 200) {
       logger.debug(`Loading archive page (${url}) with limit of (${limit})`);
-      
+
       await page.setCookie(...cookies);
       await page.goto(url, {
          waitUntil: "networkidle2",
@@ -226,12 +231,16 @@ class Crawler {
             try {
                // Do not click on selected attributes, because it changes the current page and interrupts the navigation
                if (!link_class_names.includes("selected")) {
-                  logger.debug(`Skipping attribute link with title (${await link.getProperty('title')}), because it contains (${link_class_names}) class names`)
-                  
+                  logger.debug(
+                     `Skipping attribute link with title (${await link.getProperty(
+                        "title"
+                     )}), because it contains (${link_class_names}) class names`
+                  );
+
                   await link.click();
                }
             } catch (e) {
-               logger.error(`Skipped error: ${e}`)
+               logger.error(`Skipped error: ${e}`);
                continue;
             }
 
@@ -278,7 +287,7 @@ class Crawler {
             });
          }
       }
-      
+
       logger.debug(`Extracted variations (${JSON.stringify(variations)})`);
 
       return variations;
@@ -290,14 +299,16 @@ class Crawler {
     * @returns Variant Or Simple
     */
    static async get_product_type(page) {
+      const container = await page.$('.container-right-content');
+      
       // Extract title
-      const element = await page.$(".slicing-attributes");
+      const element = await container.$(".slicing-attributes");
       let element_content = "";
       if (element) {
          element_content = await element.evaluate((e) => e.innerText);
       }
 
-      const other_attributes = await page.$('[class*="-variant-wrapper"]');
+      const other_attributes = await container.$('[class*="-variant-wrapper"]');
       let other_attributes_content = "";
       if (other_attributes) {
          other_attributes_content = await other_attributes.evaluate(
@@ -306,9 +317,7 @@ class Crawler {
       }
 
       if (
-         !element &&
          element_content === "" &&
-         !other_attributes &&
          other_attributes_content === ""
       ) {
          return constant.product_type.simple;
@@ -324,9 +333,11 @@ class Crawler {
       };
 
       const wrapper = await page.$(".container-right-content");
-      const attributes_wrappers = await wrapper.$$(".slicing-attributes section");
+      const attributes_wrappers = await wrapper.$$(
+         ".slicing-attributes section"
+      );
       const other_attributes = await wrapper.$$('[class*="-variant-wrapper"]');
-      
+
       for (let index = 0; index < attributes_wrappers.length; index++) {
          const attributes_wrapper = attributes_wrappers[index];
 
