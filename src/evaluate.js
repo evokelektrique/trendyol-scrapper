@@ -25,6 +25,9 @@ class Evaluate {
 
    static evaluate_extract_product_properties() {
       const wrapper = document.querySelector(".detail-attr-container");
+      if(!wrapper) {
+         return [];
+      }
       const items = wrapper.querySelectorAll(".detail-attr-item");
       const properties = {};
 
