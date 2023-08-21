@@ -82,7 +82,6 @@ app.post(
       }
       
       const page = await Crawler.launch_browser();
-      // const base_url = "https://www.trendyol.com";
       const urls = req.body.urls;
       
       /**
@@ -92,22 +91,15 @@ app.post(
       let extracted_links = [];
 
       for (let i = 0; i < urls.length; i++) {
-         const url = urls[i];
-         const links = await Crawler.load_archive_page(page, url, limit);
+         const url = new URL(urls[i]); // Add most recent products to url
+         url.searchParams.append("sst", "MOST_RECENT");
+         const links = await Crawler.load_archive_page(page, url.href, limit);
          extracted_links.push(links);
       }
       // Flatten links array
       extracted_links = extracted_links.flat(Infinity);
-
-      // /**
-      //  * Extract product
-      //  */
-      // for (let i = 0; i < extracted_links.length; i++) {
-      //    const url = base_url + extracted_links[i];
-
-      //    const product = await Crawler.load_product_page(page, url);
-      //    console.log(product);
-      // }
+      const base_url = "https://www.trendyol.com";
+      const linksWithBaseUrl = extracted_links.map(link => new URL(link, base_url).href);
 
       // Close current page when the process is finished
       await page.close();
@@ -116,7 +108,7 @@ app.post(
       const data = {
          status: "success",
          data: {
-            links: extracted_links
+            links: linksWithBaseUrl
          },
       };
       logger.debug(`Send response (${JSON.stringify(data)})`);
@@ -155,6 +147,9 @@ app.post(
 app.use(middleware_errors);
 
 // Start the server
-app.listen(server_port, server_host, () => {
+const server = app.listen(server_port, server_host, () => {
    console.log(`App is listening on port ${server_port}`);
 });
+
+server.keepAliveTimeout = 1000 * 1000;
+server.headersTimeout = 1000 * 1000;
