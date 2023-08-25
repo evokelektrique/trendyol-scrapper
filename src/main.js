@@ -187,26 +187,3 @@ app.use((error, req, res, next) => {
 const server = app.listen(server_port, server_host, () => {
    console.log(`App is listening on port ${server_port}`);
 });
-
-// // Set timeout for incoming connections
-// server.on("connection", (socket) => {
-//    logger.info(`Socket connected`);
-
-//    const requestTimeout = setTimeout(() => {
-//       logger.info(`Request timeout reached`);
-//       socket.destroy();
-//    }, 5 * 60 * 1000);
-
-//    socket.once("timeout", () => {
-//       logger.info(`Socket timeout reached`);
-//       clearTimeout(requestTimeout);
-//       process.nextTick(() => {
-//          socket.destroy();
-//       });
-//    });
-
-//    socket.on("close", () => {
-//       logger.info(`Socket disconnected`);
-//       clearTimeout(requestTimeout);
-//    });
-// });
