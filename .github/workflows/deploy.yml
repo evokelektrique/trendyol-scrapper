@@ -19,6 +19,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PRIVATE_KEY_PASSWORD }}
           script: |
             cd /var/www/trendyol-scrapper
             cp /var/env-config/trendyol-scrapper-production.env /var/www/trendyol-scrapper/.env
