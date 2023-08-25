@@ -6,6 +6,6 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - trendyol_data:/usr/src/app
-volumes:
-  trendyol_data:
+      - ./.env:/usr/src/app/.env
+# volumes:
+#   trendyol_data:

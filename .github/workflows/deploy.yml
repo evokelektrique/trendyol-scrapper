@@ -24,6 +24,6 @@ jobs:
             cp /var/env-config/trendyol-scrapper-production.env /var/www/trendyol-scrapper/.env
             git pull origin master
             docker compose down
-            docker compose build
+            docker build -t trendyol-scrapper .
             docker compose up -d
 
