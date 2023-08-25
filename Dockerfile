@@ -10,6 +10,9 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY package*.json ./
 
+# Copy .env file
+COPY .env ./
+
 RUN npm install
 # If you are building your code for production
 # RUN npm ci --omit=dev
