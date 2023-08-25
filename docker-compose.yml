@@ -1,0 +1,11 @@
+version: '3'
+services:
+  node_app:
+    build:
+      context: .  # Set to the directory containing your Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - trendyol_data:/usr/src/app
+volumes:
+  trendyol_data:
