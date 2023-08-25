@@ -8,6 +8,7 @@ const Crawler = require("./crawler.js");
 const express = require("express");
 const asyncHandler = require("express-async-handler"); // Async requests handler
 require("express-async-errors"); // Async error handler
+
 const createError = require("http-errors"); // Error handling
 const app = express();
 const server_port = process.env.SERVER_PORT;
@@ -18,7 +19,7 @@ const fs = require("fs");
 const path = require("path");
 
 // Logger
-const logger = require('./logger');
+const logger = require("./logger");
 
 /**
  * Recaptcha solver configuration, replacing API
@@ -77,13 +78,20 @@ app.use(middleware_authenthication);
 app.post(
    "/extract_archive_links",
    asyncHandler(async (req, res, next) => {
-      if(!req.body.urls) {
+      if (!req.body.urls) {
          throw createError(422, "urls not defined");
       }
-      
+
       const page = await Crawler.launch_browser();
+
+      // // Set a timeout for page operations
+      // const operationTimeout = setTimeout(() => {
+      //    page.close();
+      //    logger.info("Browser closed due to timeout");
+      // }, 5 * 60 * 1000); // 5 minutes
+
       const urls = req.body.urls;
-      
+
       /**
        * Extract links
        */
@@ -99,7 +107,11 @@ app.post(
       // Flatten links array
       extracted_links = extracted_links.flat(Infinity);
       const base_url = "https://www.trendyol.com";
-      const linksWithBaseUrl = extracted_links.map(link => new URL(link, base_url).href);
+      const linksWithBaseUrl = extracted_links.map(
+         (link) => new URL(link, base_url).href
+      );
+
+      // clearTimeout(operationTimeout); // Clear the timeout
 
       // Close current page when the process is finished
       await page.close();
@@ -108,11 +120,11 @@ app.post(
       const data = {
          status: "success",
          data: {
-            links: linksWithBaseUrl
+            links: linksWithBaseUrl,
          },
       };
-      logger.debug(`Send response (${JSON.stringify(data)})`);
       res.json(data);
+      logger.debug(`Send response`);
    })
 );
 
@@ -122,34 +134,79 @@ app.post(
 app.post(
    "/extract_product",
    asyncHandler(async (req, res, next) => {
-      if(!req.body.url) {
+      if (!req.body.url) {
          throw createError(422, "url not defined");
       }
-      
+
       const page = await Crawler.launch_browser();
+
+      // // Set a timeout for page operations
+      // const operationTimeout = setTimeout(() => {
+      //    page.close();
+      //    logger.info("Browser closed due to timeout");
+      // }, 5 * 60 * 1000); // 5 minutes
+
       const product = await Crawler.load_product_page(page, req.body.url);
+      // clearTimeout(operationTimeout); // Clear the timeout
       await page.close();
       logger.info("Browser closed");
-      
+
       const data = {
          status: "success",
          data: {
-            product: product
+            product: product,
          },
       };
 
-      logger.debug(`Send response (${JSON.stringify(data)})`);
       res.json(data);
+      logger.debug(`Send response`);
    })
 );
 
 // Error handling middleware
-app.use(middleware_errors);
+app.use((error, req, res, next) => {
+   console.log(error);
+   logger.error(error);
+
+   // Handle known errors
+   if (error instanceof createError.HttpError) {
+      res.status(error.status).json({
+         status: "error",
+         message: error.message,
+      });
+   } else {
+      // Handle unknown errors
+      res.status(500).json({
+         status: "error",
+         message: "Internal server error",
+      });
+   }
+});
 
 // Start the server
 const server = app.listen(server_port, server_host, () => {
    console.log(`App is listening on port ${server_port}`);
 });
 
-server.keepAliveTimeout = 1000 * 1000;
-server.headersTimeout = 1000 * 1000;
+// // Set timeout for incoming connections
+// server.on("connection", (socket) => {
+//    logger.info(`Socket connected`);
+
+//    const requestTimeout = setTimeout(() => {
+//       logger.info(`Request timeout reached`);
+//       socket.destroy();
+//    }, 5 * 60 * 1000);
+
+//    socket.once("timeout", () => {
+//       logger.info(`Socket timeout reached`);
+//       clearTimeout(requestTimeout);
+//       process.nextTick(() => {
+//          socket.destroy();
+//       });
+//    });
+
+//    socket.on("close", () => {
+//       logger.info(`Socket disconnected`);
+//       clearTimeout(requestTimeout);
+//    });
+// });

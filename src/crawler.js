@@ -288,7 +288,7 @@ class Crawler {
          }
       }
 
-      logger.debug(`Extracted variations (${JSON.stringify(variations)})`);
+      logger.debug(`Extracted variations (${variations.length})`);
 
       return variations;
    }
