@@ -1,6 +1,7 @@
 // Load environment files
 const dotenv = require("dotenv");
 dotenv.config();
+
 // const tracer = require("./tracer")("node_trendyol_scrapper");
 const Crawler = require("./crawler.js");
 
@@ -36,6 +37,32 @@ confData = confData.replace(
    `antiCapthaPredefinedApiKey = '${apiKey}'`
 );
 fs.writeFileSync(plugin_path, confData, "utf8");
+
+// Queues
+const { Worker, Queue } = require("bullmq");
+
+const queue_options = {
+   connection: {
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+      password: process.env.REDIS_PASSWORD,
+   },
+};
+
+// Create a new connection in every instance
+const extractLinkQueue = new Queue("extract_link_queue", queue_options);
+const extractLinkWorker = new Worker("extract_link_queue", async (job) => {
+   const page = await Crawler.launch_browser();
+   const product = await Crawler.load_product_page(page, job.data.url);
+   await page.close();
+   logger.info("Browser closed");
+}, queue_options);
+
+const extractArchiveQueue = new Queue("extract_archive_queue", queue_options);
+const extractArchiveWorker = new Worker("extract_archive_queue", async (job) => {
+   console.log(job.data);
+}, queue_options);
+
 
 /**
  * Authenthication middleware
@@ -78,49 +105,58 @@ app.use(middleware_authenthication);
 app.post(
    "/extract_archive_links",
    asyncHandler(async (req, res, next) => {
-      if (!req.body.urls) {
-         throw createError(422, "urls not defined");
-      }
+      // if (!req.body.urls) {
+      //    throw createError(422, "urls not defined");
+      // }
 
-      const page = await Crawler.launch_browser();
+      // const page = await Crawler.launch_browser();
 
-      // // Set a timeout for page operations
-      // const operationTimeout = setTimeout(() => {
-      //    page.close();
-      //    logger.info("Browser closed due to timeout");
-      // }, 5 * 60 * 1000); // 5 minutes
+      // // // Set a timeout for page operations
+      // // const operationTimeout = setTimeout(() => {
+      // //    page.close();
+      // //    logger.info("Browser closed due to timeout");
+      // // }, 5 * 60 * 1000); // 5 minutes
 
-      const urls = req.body.urls;
+      // const urls = req.body.urls;
 
-      /**
-       * Extract links
-       */
-      const limit = 200;
-      let extracted_links = [];
+      // /**
+      //  * Extract links
+      //  */
+      // const limit = 200;
+      // let extracted_links = [];
 
-      for (let i = 0; i < urls.length; i++) {
-         const url = new URL(urls[i]); // Add most recent products to url
-         url.searchParams.append("sst", "MOST_RECENT");
-         const links = await Crawler.load_archive_page(page, url.href, limit);
-         extracted_links.push(links);
-      }
-      // Flatten links array
-      extracted_links = extracted_links.flat(Infinity);
-      const base_url = "https://www.trendyol.com";
-      const linksWithBaseUrl = extracted_links.map(
-         (link) => new URL(link, base_url).href
-      );
+      // for (let i = 0; i < urls.length; i++) {
+      //    const url = new URL(urls[i]); // Add most recent products to url
+      //    url.searchParams.append("sst", "MOST_RECENT");
+      //    const links = await Crawler.load_archive_page(page, url.href, limit);
+      //    extracted_links.push(links);
+      // }
+      // // Flatten links array
+      // extracted_links = extracted_links.flat(Infinity);
+      // const base_url = "https://www.trendyol.com";
+      // const linksWithBaseUrl = extracted_links.map(
+      //    (link) => new URL(link, base_url).href
+      // );
 
-      // clearTimeout(operationTimeout); // Clear the timeout
+      // // clearTimeout(operationTimeout); // Clear the timeout
 
-      // Close current page when the process is finished
-      await page.close();
-      logger.info("Browser closed");
+      // // Close current page when the process is finished
+      // await page.close();
+      // logger.info("Browser closed");
+
+      // const data = {
+      //    status: "success",
+      //    data: {
+      //       links: linksWithBaseUrl,
+      //    },
+      // };
+      // res.json(data);
+      // logger.debug(`Send response`);
 
       const data = {
-         status: "success",
+         status: "in_queue",
          data: {
-            links: linksWithBaseUrl,
+            links: [],
          },
       };
       res.json(data);
@@ -138,24 +174,15 @@ app.post(
          throw createError(422, "url not defined");
       }
 
-      const page = await Crawler.launch_browser();
-
-      // // Set a timeout for page operations
-      // const operationTimeout = setTimeout(() => {
-      //    page.close();
-      //    logger.info("Browser closed due to timeout");
-      // }, 5 * 60 * 1000); // 5 minutes
-
-      const product = await Crawler.load_product_page(page, req.body.url);
-      // clearTimeout(operationTimeout); // Clear the timeout
-      await page.close();
-      logger.info("Browser closed");
-
+      extractLinkQueue.add(
+         'extract_link_queue',
+         { url: req.body.url },
+         { removeOnComplete: true, removeOnFail: true },
+      );
+      
       const data = {
-         status: "success",
-         data: {
-            product: product,
-         },
+         status: "in_queue",
+         data: []
       };
 
       res.json(data);
@@ -184,6 +211,6 @@ app.use((error, req, res, next) => {
 });
 
 // Start the server
-const server = app.listen(server_port, server_host, () => {
+const server = app.listen(server_port, server_host, async () => {
    console.log(`App is listening on port ${server_port}`);
 });
