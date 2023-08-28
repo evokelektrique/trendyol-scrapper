@@ -2,6 +2,8 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
+const axios = require("axios");
+
 // const tracer = require("./tracer")("node_trendyol_scrapper");
 const Crawler = require("./crawler.js");
 
@@ -39,7 +41,10 @@ confData = confData.replace(
 fs.writeFileSync(plugin_path, confData, "utf8");
 
 // Queues
-const { Worker, Queue } = require("bullmq");
+const { Worker, Queue, QueueEvents, Job } = require("bullmq");
+const { createBullBoard } = require("@bull-board/api");
+const { BullMQAdapter } = require("@bull-board/api/bullMQAdapter");
+const { ExpressAdapter } = require("@bull-board/express");
 
 const queue_options = {
    connection: {
@@ -49,20 +54,152 @@ const queue_options = {
    },
 };
 
+const worker_options = {
+   connection: {
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT,
+      password: process.env.REDIS_PASSWORD,
+   },
+   limiter: {
+      max: 10,
+      duration: 60000,
+   },
+};
+
 // Create a new connection in every instance
 const extractLinkQueue = new Queue("extract_link_queue", queue_options);
-const extractLinkWorker = new Worker("extract_link_queue", async (job) => {
-   const page = await Crawler.launch_browser();
-   const product = await Crawler.load_product_page(page, job.data.url);
-   await page.close();
-   logger.info("Browser closed");
-}, queue_options);
+const extractLinkQueueEvents = new QueueEvents(
+   "extract_link_queue",
+   queue_options
+);
+const extractLinkWorker = new Worker(
+   "extract_link_queue",
+   async (job) => {
+      const page = await Crawler.launch_browser();
+      const product = await Crawler.load_product_page(page, job.data.url);
+      await page.close();
+      logger.info("Browser closed");
+
+      const data = {
+         status: "success",
+         data: {
+            type: "link",
+            uuid: job.data.uuid,
+            product: product,
+         },
+      };
+
+      return data;
+   },
+   worker_options
+);
+extractLinkQueueEvents.on("completed", async ({ jobId }) => {
+   logger.info("JOB COMPLETED " + jobId);
+   const job = await Job.fromId(extractLinkQueue, jobId);
+   const data = job.returnvalue;
+
+   const url = process.env.KE_BASE_API_URL + "/link/store";
+   const privateKey = process.env.KE_API_KEY; // Replace with your actual private API key
+   const config = {
+      headers: {
+         PRIVATE_API_KEY: privateKey,
+         "Content-Type": "application/json", // You can also include other headers here
+      },
+   };
+   logger.info(`Request POST: url(${url})`);
+   logger.info(`Request POST: url(${url}) - ` + JSON.stringify(data));
+   try {
+      const response = await axios.post(url, data, config);
+      logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
+   } catch (error) {
+      logger.error("Error: " + error.message);
+   }
+});
 
 const extractArchiveQueue = new Queue("extract_archive_queue", queue_options);
-const extractArchiveWorker = new Worker("extract_archive_queue", async (job) => {
-   console.log(job.data);
-}, queue_options);
+const extractArchiveQueueEvents = new QueueEvents(
+   "extract_archive_queue",
+   queue_options
+);
+const extractArchiveWorker = new Worker(
+   "extract_archive_queue",
+   async (job) => {
+      const page = await Crawler.launch_browser();
+      const urls = job.data.urls;
 
+      /**
+       * Extract links
+       */
+      const limit = 200;
+      let extracted_links = [];
+
+      for (let i = 0; i < urls.length; i++) {
+         // Add most recent products to url
+         const url = new URL(urls[i]);
+         url.searchParams.append("sst", "MOST_RECENT");
+
+         // Crawl it
+         const links = await Crawler.load_archive_page(page, url.href, limit);
+         extracted_links.push(links);
+      }
+
+      // Flatten links array
+      extracted_links = extracted_links.flat(Infinity);
+      const base_url = "https://www.trendyol.com";
+      const linksWithBaseUrl = extracted_links.map(
+         (link) => new URL(link, base_url).href
+      );
+
+      // Close current page when the process is finished
+      await page.close();
+      logger.info("Browser closed");
+
+      const data = {
+         status: "success",
+         data: {
+            type: "archive",
+            uuid: job.data.uuid,
+            links: linksWithBaseUrl,
+         },
+      };
+
+      return data;
+   },
+   worker_options
+);
+
+extractArchiveQueueEvents.on("completed", async ({ jobId }) => {
+   logger.info("JOB COMPLETED " + jobId);
+   const job = await Job.fromId(extractLinkQueue, jobId);
+   const data = job.returnvalue;
+
+   const url = process.env.KE_BASE_API_URL + "/link/store";
+   const privateKey = process.env.KE_API_KEY; // Replace with your actual private API key
+   const config = {
+      headers: {
+         PRIVATE_API_KEY: privateKey,
+         "Content-Type": "application/json", // You can also include other headers here
+      },
+   };
+   logger.info(`Request POST: url(${url}) - ` + JSON.stringify(data));
+   try {
+      const response = await axios.post(url, data, config);
+      logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
+   } catch (error) {
+      logger.error("Error: " + error.message);
+   }
+});
+
+const serverAdapter = new ExpressAdapter();
+const bullBoard = createBullBoard({
+   queues: [
+      new BullMQAdapter(extractArchiveQueue),
+      new BullMQAdapter(extractLinkQueue),
+   ],
+   serverAdapter: serverAdapter,
+});
+serverAdapter.setBasePath("/admin");
+app.use("/admin", serverAdapter.getRouter());
 
 /**
  * Authenthication middleware
@@ -105,53 +242,14 @@ app.use(middleware_authenthication);
 app.post(
    "/extract_archive_links",
    asyncHandler(async (req, res, next) => {
-      // if (!req.body.urls) {
-      //    throw createError(422, "urls not defined");
-      // }
+      if (!req.body.urls) {
+         throw createError(422, "urls not defined");
+      }
 
-      // const page = await Crawler.launch_browser();
-
-      // // // Set a timeout for page operations
-      // // const operationTimeout = setTimeout(() => {
-      // //    page.close();
-      // //    logger.info("Browser closed due to timeout");
-      // // }, 5 * 60 * 1000); // 5 minutes
-
-      // const urls = req.body.urls;
-
-      // /**
-      //  * Extract links
-      //  */
-      // const limit = 200;
-      // let extracted_links = [];
-
-      // for (let i = 0; i < urls.length; i++) {
-      //    const url = new URL(urls[i]); // Add most recent products to url
-      //    url.searchParams.append("sst", "MOST_RECENT");
-      //    const links = await Crawler.load_archive_page(page, url.href, limit);
-      //    extracted_links.push(links);
-      // }
-      // // Flatten links array
-      // extracted_links = extracted_links.flat(Infinity);
-      // const base_url = "https://www.trendyol.com";
-      // const linksWithBaseUrl = extracted_links.map(
-      //    (link) => new URL(link, base_url).href
-      // );
-
-      // // clearTimeout(operationTimeout); // Clear the timeout
-
-      // // Close current page when the process is finished
-      // await page.close();
-      // logger.info("Browser closed");
-
-      // const data = {
-      //    status: "success",
-      //    data: {
-      //       links: linksWithBaseUrl,
-      //    },
-      // };
-      // res.json(data);
-      // logger.debug(`Send response`);
+      extractArchiveQueue.add("extract_archive_queue", {
+         url: req.body.urls,
+         uuid: req.body.uuid,
+      });
 
       const data = {
          status: "in_queue",
@@ -159,6 +257,7 @@ app.post(
             links: [],
          },
       };
+
       res.json(data);
       logger.debug(`Send response`);
    })
@@ -174,15 +273,14 @@ app.post(
          throw createError(422, "url not defined");
       }
 
-      extractLinkQueue.add(
-         'extract_link_queue',
-         { url: req.body.url },
-         { removeOnComplete: true, removeOnFail: true },
-      );
-      
+      extractLinkQueue.add("extract_link_queue", {
+         url: req.body.url,
+         uuid: req.body.uuid,
+      });
+
       const data = {
          status: "in_queue",
-         data: []
+         data: [],
       };
 
       res.json(data);
