@@ -31,7 +31,6 @@ jobs:
           command: c
           cwd: "./"
           files: |
-            logs/
             captain-definition
           outPath: deploy.tar
 
