@@ -11,7 +11,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Copy .env file
-COPY .env ./
+# COPY .env ./
 
 RUN npm install
 # If you are building your code for production
