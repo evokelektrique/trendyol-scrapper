@@ -199,8 +199,6 @@ class Crawler {
          await page.waitForTimeout(2000);
       }
 
-      logger.debug(`Extracted links (${links.length}) total`);
-
       return links;
    }
 

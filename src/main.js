@@ -47,6 +47,13 @@ const { BullMQAdapter } = require("@bull-board/api/bullMQAdapter");
 const { ExpressAdapter } = require("@bull-board/express");
 
 const queue_options = {
+   defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+         type: "exponential",
+         delay: 1000,
+      },
+   },
    connection: {
       host: process.env.REDIS_HOST,
       port: process.env.REDIS_PORT,
@@ -75,19 +82,36 @@ const extractLinkQueueEvents = new QueueEvents(
 const extractLinkWorker = new Worker(
    "extract_link_queue",
    async (job) => {
-      const page = await Crawler.launch_browser();
-      const product = await Crawler.load_product_page(page, job.data.url);
-      await page.close();
-      logger.info("Browser closed");
+      let data;
 
-      const data = {
-         status: "success",
-         data: {
-            type: "link",
-            uuid: job.data.uuid,
-            product: product,
-         },
-      };
+      try {
+         const page = await Crawler.launch_browser();
+         const product = await Crawler.load_product_page(page, job.data.url);
+         await page.close();
+         logger.info("Browser closed");
+
+         data = {
+            status: "success",
+            data: {
+               type: "link",
+               uuid: job.data.uuid,
+               product: product,
+            },
+         };
+      } catch (error) {
+         logger.info("Error " + error.message);
+
+         data = {
+            status: "failed",
+            data: {
+               type: "link",
+               uuid: job.data.uuid,
+               product: [],
+            },
+         };
+
+         // await job.moveToFailed(e, token, false);
+      }
 
       return data;
    },
@@ -124,44 +148,66 @@ const extractArchiveQueueEvents = new QueueEvents(
 const extractArchiveWorker = new Worker(
    "extract_archive_queue",
    async (job) => {
-      const page = await Crawler.launch_browser();
-      const urls = job.data.urls;
+      let data;
 
-      /**
-       * Extract links
-       */
-      const limit = 200;
-      let extracted_links = [];
+      try {
+         const page = await Crawler.launch_browser();
+         const urls = job.data.urls;
 
-      for (let i = 0; i < urls.length; i++) {
-         // Add most recent products to url
-         const url = new URL(urls[i]);
-         url.searchParams.append("sst", "MOST_RECENT");
+         /**
+          * Extract links
+          */
+         const limit = 200;
+         let extracted_links = [];
+         for (let i = 0; i < urls.length; i++) {
+            // Add most recent products to url
+            const url = new URL(urls[i]);
+            url.searchParams.append("sst", "MOST_RECENT");
 
-         // Crawl it
-         const links = await Crawler.load_archive_page(page, url.href, limit);
-         extracted_links.push(links);
+            // Crawl it
+            const links = await Crawler.load_archive_page(
+               page,
+               url.href,
+               limit
+            );
+            extracted_links.push(links);
+         }
+
+         // Flatten links array
+         extracted_links = extracted_links.flat(Infinity);
+         const base_url = "https://www.trendyol.com";
+         const linksWithBaseUrl = extracted_links.map(
+            (link) => new URL(link, base_url).href
+         );
+
+         logger.debug(`Extracted links (${linksWithBaseUrl.length}) total`);
+
+         // Close current page when the process is finished
+         await page.close();
+         logger.info("Browser closed");
+
+         data = {
+            status: "success",
+            data: {
+               type: "archive",
+               uuid: job.data.uuid,
+               links: linksWithBaseUrl,
+            },
+         };
+      } catch (error) {
+         logger.info("Error " + error.message);
+
+         data = {
+            status: "failed",
+            data: {
+               type: "archive",
+               uuid: job.data.uuid,
+               links: [],
+            },
+         };
+         
+         // await job.moveToFailed(e, token, false);
       }
-
-      // Flatten links array
-      extracted_links = extracted_links.flat(Infinity);
-      const base_url = "https://www.trendyol.com";
-      const linksWithBaseUrl = extracted_links.map(
-         (link) => new URL(link, base_url).href
-      );
-
-      // Close current page when the process is finished
-      await page.close();
-      logger.info("Browser closed");
-
-      const data = {
-         status: "success",
-         data: {
-            type: "archive",
-            uuid: job.data.uuid,
-            links: linksWithBaseUrl,
-         },
-      };
 
       return data;
    },
@@ -170,7 +216,7 @@ const extractArchiveWorker = new Worker(
 
 extractArchiveQueueEvents.on("completed", async ({ jobId }) => {
    logger.info("JOB COMPLETED " + jobId);
-   const job = await Job.fromId(extractLinkQueue, jobId);
+   const job = await Job.fromId(extractArchiveQueue, jobId);
    const data = job.returnvalue;
 
    const url = process.env.KE_BASE_API_URL + "/link/store";
@@ -247,7 +293,7 @@ app.post(
       }
 
       extractArchiveQueue.add("extract_archive_queue", {
-         url: req.body.urls,
+         urls: req.body.urls,
          uuid: req.body.uuid,
       });
 

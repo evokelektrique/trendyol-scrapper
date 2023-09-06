@@ -28,7 +28,7 @@ const logger = createLogger({
          filename: "logs/app-%DATE%.log",
          datePattern: "YYYY-MM-DD",
          zippedArchive: true,
-         maxFiles: "14d",
+         maxFiles: "30d",
       }),
    ].filter(Boolean), // Remove falsy values (e.g., null) from the array
 });
