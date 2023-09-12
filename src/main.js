@@ -95,6 +95,7 @@ const extractLinkWorker = new Worker(
             data: {
                type: "link",
                uuid: job.data.uuid,
+               url: job.data.url,
                product: product,
             },
          };
@@ -106,6 +107,7 @@ const extractLinkWorker = new Worker(
             data: {
                type: "link",
                uuid: job.data.uuid,
+               url: job.data.url,
                product: [],
             },
          };
@@ -191,6 +193,7 @@ const extractArchiveWorker = new Worker(
             data: {
                type: "archive",
                uuid: job.data.uuid,
+               url: urls[0],
                links: linksWithBaseUrl,
             },
          };
@@ -202,6 +205,7 @@ const extractArchiveWorker = new Worker(
             data: {
                type: "archive",
                uuid: job.data.uuid,
+               url: urls[0],
                links: [],
             },
          };
