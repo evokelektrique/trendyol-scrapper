@@ -193,6 +193,30 @@ class Evaluate {
 
       document.body.classList = "";
    }
+
+   /**
+    * Retrieve if product is in stock/available to purchase or not.
+    * 
+    * @returns {Boolean} Product availability
+    */
+   static evaluate_get_product_availability() {
+      const product_button_container = document.querySelector('.product-button-container');
+      const sold_out_button = product_button_container.querySelector('.sold-out');
+      const add_to_basket_button = product_button_container.querySelector('.add-to-basket');
+      
+      if(add_to_basket_button) {
+         return [product_button_container, add_to_basket_button, sold_out_button];
+         return true;
+      }
+      
+      // If button is available in product_button_container,
+      // this product is sold out so return false
+      if(sold_out_button === undefined) {
+         return false;
+      }
+      
+      return true;
+   }
 }
 
 module.exports = Evaluate;

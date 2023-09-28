@@ -1,9 +1,6 @@
 const { createLogger, transports, format } = require("winston");
 const DailyRotateFile = require("winston-daily-rotate-file");
 
-// Determine if the environment is production
-const isProduction = process.env.APP_ENV === "production";
-
 const timezoned = () => {
    return new Date().toLocaleString("en-US", {
       timeZone: process.env.TIMEZONE,
@@ -21,7 +18,7 @@ const logger = createLogger({
    ),
    transports: [
       // Log to the console if not in production
-      !isProduction && new transports.Console(),
+      new transports.Console(),
 
       // Log to a daily rotating file
       new DailyRotateFile({

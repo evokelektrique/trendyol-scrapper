@@ -209,7 +209,7 @@ const extractArchiveWorker = new Worker(
                links: [],
             },
          };
-         
+
          // await job.moveToFailed(e, token, false);
       }
 
@@ -240,11 +240,86 @@ extractArchiveQueueEvents.on("completed", async ({ jobId }) => {
    }
 });
 
+const fastSyncQueue = new Queue("fast_sync_queue", queue_options);
+const fastSyncQueueEvents = new QueueEvents(
+   "fast_sync_queue",
+   queue_options
+);
+const fastSyncWorker = new Worker(
+   "fast_sync_queue",
+   async (job) => {
+      let data;
+
+      try {
+         const page = await Crawler.launch_browser();
+         const product = await Crawler.load_product_page_fast(page, job.data.url, job.data.target_link_titles);
+
+         // Close current page when the process is finished
+         await page.close();
+         logger.info("Browser closed");
+
+         data = {
+            status: "success",
+            data: {
+               type: "link",
+               uuid: job.data.uuid,
+               url: job.data.url,
+               variation_id: job.data.variation_id,
+               target_link_titles: job.data.target_link_titles,
+               product: product,
+            },
+         };
+      } catch (error) {
+         logger.info("Error " + error.message);
+
+         data = {
+            status: "failed",
+            data: {
+               type: "link",
+               uuid: job.data.uuid,
+               url: job.data.url,
+               variation_id: job.data.variation_id,
+               target_link_titles: job.data.target_link_titles,
+               product: [],
+            },
+         };
+
+         // await job.moveToFailed(e, token, false);
+      }
+
+      return data;
+   },
+   worker_options
+);
+
+fastSyncQueueEvents.on("completed", async ({ jobId }) => {
+   logger.info("JOB COMPLETED " + jobId);
+   const job = await Job.fromId(fastSyncQueue, jobId);
+   const data = job.returnvalue;
+
+   const url = process.env.KE_BASE_API_URL + "/link/fast_store";
+   const privateKey = process.env.KE_API_KEY; // Replace with your actual private API key
+   const config = {
+      headers: {
+         PRIVATE_API_KEY: privateKey,
+         "Content-Type": "application/json", // You can also include other headers here
+      },
+   };
+   logger.info(`Request POST: url(${url}) - ` + JSON.stringify(data));
+   try {
+      const response = await axios.post(url, data, config);
+      logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
+   } catch (error) {
+      logger.error("Error: " + error.message);
+   }
+});
+
 const serverAdapter = new ExpressAdapter();
 const bullBoard = createBullBoard({
    queues: [
       new BullMQAdapter(extractArchiveQueue),
       new BullMQAdapter(extractLinkQueue),
+      new BullMQAdapter(fastSyncQueue),
    ],
    serverAdapter: serverAdapter,
 });
@@ -327,6 +402,40 @@ app.post(
          url: req.body.url,
          uuid: req.body.uuid,
       });
+
+      const data = {
+         status: "in_queue",
+         data: [],
+      };
+
+      res.json(data);
+      logger.debug(`Send response`);
+   })
+);
+
+/**
+ * /fast_sync
+ */
+app.post(
+   "/fast_sync",
+   asyncHandler(async (req, res, next) => {
+      if (!req.body.url) {
+         throw createError(422, "url not defined");
+      }
+
+      fastSyncQueue.add("fast_sync_queue", {
+         url: req.body.url,
+         uuid: req.body.uuid,
+         target_link_titles: req.body.target_link_titles,
+         variation_id: req.body.variation_id,
+      });
+
+      logger.debug(JSON.stringify({
+         url: req.body.url,
+         uuid: req.body.uuid,
+         target_link_titles: req.body.target_link_titles,
+         variation_id: req.body.variation_id,
+      }));
 
       const data = {
          status: "in_queue",

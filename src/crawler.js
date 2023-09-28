@@ -45,6 +45,95 @@ class Crawler {
       return page;
    }
 
+   static async load_product_page_fast(page, url, target_link_titles) {
+      // Initial product data structure
+      const data = {
+         source: constant.source,
+         type: null,
+         title: null,
+         brand: null,
+         description: null,
+         price: null,
+         currency_code: constant.currency.tr.code,
+         variations: [],
+         recent_reviews: [],
+         properties: [],
+         images: [],
+         is_available: false,
+      };
+
+      logger.info("Opening " + url);
+
+      // Set TR cookies
+      await page.setCookie(...cookies);
+      await page.goto(url, {
+         waitUntil: "networkidle2",
+      });
+
+      // Remove unnecessary elements form current page
+      try {
+         await this.remove_elements(page);
+      } catch (e) { }
+
+      /**
+       * Extract product data
+       */
+
+      // Extract extra attributes
+      const properties = await page.evaluate(
+         Evaluate.evaluate_extract_product_properties
+      );
+      data.properties = properties;
+      logger.debug(
+         "Extracted product properties " + properties.length + " total"
+      );
+
+      // Get product type, It's either SIMPLE or VARIANT
+      const type = await this.get_product_type(page);
+      data.type = type;
+      logger.debug("Extracted product type " + type);
+
+      switch (type) {
+         case constant.product_type.variable:
+            // Extract product variations and its prices
+            const variations = await this.extract_product_variations(page, true, target_link_titles);
+            data.variations = variations;
+            logger.debug(
+               "Extracted product variations " + variations.length + " total"
+            );
+            break;
+
+         case constant.product_type.simple:
+            // Availability
+            const is_available = await this.get_product_availability(page);
+            data.available = is_available;
+
+            const price = await page.evaluate(
+               Evaluate.evaluate_extract_product_price
+            );
+            if (parseCurrency(price.regular) || parseCurrency(price.featured)) {
+               data.price = price;
+               if (parseCurrency(data.price.regular)) {
+                  data.price.regular = parseCurrency(data.price.regular).value;
+               }
+               if (parseCurrency(data.price.featured)) {
+                  data.price.featured = parseCurrency(
+                     data.price.featured
+                  ).value;
+               }
+            }
+            logger.debug(
+               `Extracted product prices (regular: ${data.price.regular}) - (featured: ${data.price.featured})`
+            );
+            break;
+
+         default:
+            break;
+      }
+
+      return data;
+   }
+
    /**
     * Fetch single product page
     *
@@ -65,6 +154,7 @@ class Crawler {
          recent_reviews: [],
          properties: [],
          images: [],
+         is_available: false,
       };
 
       logger.info("Opening " + url);
@@ -78,7 +168,7 @@ class Crawler {
       // Remove unnecessary elements form current page
       try {
          await this.remove_elements(page);
-      } catch (e) {}
+      } catch (e) { }
 
       /**
        * Extract product data
@@ -137,6 +227,10 @@ class Crawler {
             break;
 
          case constant.product_type.simple:
+            // Availability
+            const is_available = await this.get_product_availability(page);
+            data.is_available = is_available;
+
             const price = await page.evaluate(
                Evaluate.evaluate_extract_product_price
             );
@@ -181,7 +275,7 @@ class Crawler {
 
       try {
          await this.remove_elements(page);
-      } catch (e) {}
+      } catch (e) { }
 
       // Extract links
       const links = [];
@@ -203,12 +297,14 @@ class Crawler {
    }
 
    /**
-    * Extract current page is product variations
+    * Extract product variations based on specified attribute and link titles.
     *
-    * @param {Object} page Puppeteer's current browser page instance
-    * @returns {Object} current page is product variations
+    * @param {Object} page - Puppeteer's current browser page instance.
+    * @param {boolean} is_fast - If true, optimize for speed and use target_link_titles.
+    * @param {Array} target_link_titles - Array of link titles to target.
+    * @returns {Array} - Array of product variations.
     */
-   static async extract_product_variations(page) {
+   static async extract_product_variations(page, is_fast = false, target_link_titles = []) {
       const extracted_attributes = await this.extract_product_attritubtes(page);
       const attribute_titles = extracted_attributes.attribute_titles;
       const variations = [];
@@ -217,77 +313,117 @@ class Crawler {
          const title = attribute_titles[index];
          const attribute_links = extracted_attributes.attributes[title];
 
-         // Loop through links
-         for (let index = 0; index < attribute_links.length; index++) {
-            const link = attribute_links[index];
-            const attributes = {};
-            const link_class_names = (
-               await link.getProperty("className")
-            ).toString();
+         if (!is_fast) {
+            for (let index = 0; index < attribute_links.length; index++) {
+               const link = attribute_links[index];
+               const attributes = {};
+               const link_class_names = (await link.getProperty("className")).toString();
 
-            // click on variation to fetch new data and new price and wait for 4 seconds
-            try {
-               // Do not click on selected attributes, because it changes the current page and interrupts the navigation
-               if (!link_class_names.includes("selected")) {
-                  logger.debug(
-                     `Skipping attribute link with title (${await link.getProperty(
-                        "title"
-                     )}), because it contains (${link_class_names}) class names`
-                  );
-
-                  await link.click();
+               try {
+                  if (!link_class_names.includes("selected")) {
+                     logger.debug(`Skipping attribute link with title (${await link.getProperty("title")}), because it contains (${link_class_names}) class names`);
+                     await link.click();
+                  }
+               } catch (e) {
+                  logger.error(`Skipped error: ${e}`);
+                  continue;
                }
-            } catch (e) {
-               logger.error(`Skipped error: ${e}`);
-               continue;
+
+               await new Promise((resolve) => setTimeout(resolve, 3000));
+               const is_available = await this.get_product_availability(page);
+
+               const linkTitle = (await link.getProperty("title")).toString().replace("JSHandle:", "");
+               attributes[title] = linkTitle;
+
+               const is_attribute_available_size = await page.evaluate(Evaluate.evaluate_is_attribute_available_size);
+               if (is_attribute_available_size) {
+                  const attributes_sizes = await page.evaluate(Evaluate.evaluate_extract_product_size_variants);
+                  attributes[attributes_sizes.title] = attributes_sizes.data;
+               }
+
+               const images = await page.evaluate(Evaluate.evaluate_extract_product_images);
+               const price = await page.evaluate(Evaluate.evaluate_extract_product_price);
+
+               if (parseCurrency(price.regular)) {
+                  price.regular = parseCurrency(price.regular).value;
+               }
+               if (parseCurrency(price.featured)) {
+                  price.featured = parseCurrency(price.featured).value;
+               }
+
+               variations.push({
+                  attributes: attributes,
+                  images: images,
+                  price: price,
+                  is_available: is_available,
+               });
             }
+         } else {
+            // If is_fast is true, process only target links based on target_link_titles
+            for (let i = 0; i < attribute_links.length; i++) {
+               const link = attribute_links[i];
+               const linkTitle = (await link.getProperty("title")).toString().replace("JSHandle:", "").trim().toLowerCase();
+               const linkContent = await page.evaluate(link => link.textContent.trim().toLowerCase(), link);
+               const link_class_names = (await link.getProperty("className")).toString();
 
-            await new Promise((resolve) => setTimeout(resolve, 4000));
+               let usedLinkInfo = '';
+               logger.debug('linkTitle ' + linkTitle);
+               logger.debug('linkContent ' + linkContent);
 
-            // Current product attribute title
-            const link_title_property = await link.getProperty("title");
-            const link_title = await link_title_property
-               .toString()
-               .replace("JSHandle:", "");
-            attributes[title] = link_title;
+               if (target_link_titles.includes(linkTitle)) {
+                  usedLinkInfo = 'linkTitle';
+                  logger.debug('linkTitle ' + linkTitle + ' found in target_link_titles');
+               } else if (target_link_titles.includes(linkContent)) {
+                  usedLinkInfo = 'linkContent';
+                  logger.debug('linkContent ' + linkContent + ' found in target_link_titles');
+               } else {
+                  usedLinkInfo = 'none';
+               }
 
-            // Check if attribute sizes is available
-            const is_attribute_available_size = await page.evaluate(
-               Evaluate.evaluate_is_attribute_available_size
-            );
-            // Size variant
-            if (is_attribute_available_size) {
-               const attributes_sizes = await page.evaluate(
-                  Evaluate.evaluate_extract_product_size_variants
-               );
-               attributes[attributes_sizes.title] = attributes_sizes.data;
+               if (target_link_titles.includes(linkTitle) || target_link_titles.includes(linkContent)) {
+                  const attributes = {};
+                  if (usedLinkInfo === 'linkTitle') {
+                     attributes[title] = linkTitle;
+                  } else {
+                     attributes[title] = linkContent;
+                  }
+
+                  try {
+                     if (!link_class_names.includes("selected")) {
+                        logger.debug(`Skipping attribute link with title (${await link.getProperty("title")}), because it contains (${link_class_names}) class names`);
+                        await link.click();
+                     }
+                  } catch (e) {
+                     logger.error(`Skipped error: ${e}`);
+                     continue;
+                  }
+
+                  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+                  // const images = await page.evaluate(Evaluate.evaluate_extract_product_images);
+                  const price = await page.evaluate(Evaluate.evaluate_extract_product_price);
+
+                  if (parseCurrency(price.regular)) {
+                     price.regular = parseCurrency(price.regular).value;
+                  }
+                  if (parseCurrency(price.featured)) {
+                     price.featured = parseCurrency(price.featured).value;
+                  }
+
+                  const is_available = await this.get_product_availability(page);
+
+                  variations.push({
+                     attributes: attributes,
+                     images: [],
+                     price: price,
+                     is_available: is_available,
+                  });
+               }
             }
-
-            const images = await page.evaluate(
-               Evaluate.evaluate_extract_product_images
-            );
-
-            // Fetch and parse prices
-            const price = await page.evaluate(
-               Evaluate.evaluate_extract_product_price
-            );
-            if (parseCurrency(price.regular)) {
-               price.regular = parseCurrency(price.regular).value;
-            }
-            if (parseCurrency(price.featured)) {
-               price.featured = parseCurrency(price.featured).value;
-            }
-
-            variations.push({
-               attributes: attributes,
-               images: images,
-               price: price,
-            });
          }
       }
 
       logger.debug(`Extracted variations (${variations.length})`);
-
       return variations;
    }
 
@@ -298,7 +434,7 @@ class Crawler {
     */
    static async get_product_type(page) {
       const container = await page.$('.container-right-content');
-      
+
       // Extract title
       const element = await container.$(".slicing-attributes");
       let element_content = "";
@@ -400,6 +536,22 @@ class Crawler {
 
       await page.evaluate(Evaluate.evaluate_remove_elements);
       await page.evaluate(Evaluate.evaluate_change_product_variation_sliders);
+   }
+
+   static async get_product_availability(page) {
+      const product_button_container = await page.$(".product-button-container");
+      const sold_out_button = await product_button_container.$('.sold-out');
+      const add_to_basket_button = await product_button_container.$('.add-to-basket');
+
+      if (add_to_basket_button) {
+         return true;
+      }
+
+      if (sold_out_button) {
+         return false;
+      }
+
+      return true;
    }
 }
 
