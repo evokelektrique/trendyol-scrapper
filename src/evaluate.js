@@ -25,7 +25,7 @@ class Evaluate {
 
    static evaluate_extract_product_properties() {
       const wrapper = document.querySelector(".detail-attr-container");
-      if(!wrapper) {
+      if (!wrapper) {
          return [];
       }
       const items = wrapper.querySelectorAll(".detail-attr-item");
@@ -147,6 +147,53 @@ class Evaluate {
       };
    }
 
+   static evaluate_extract_product_other_variants() {
+      const wrapper = document.querySelector(".container-right-content");
+      // const items = wrapper.querySelectorAll(".sp-itm:not(.so)");
+      // const title = wrapper
+      //    .querySelector(".size-variant-title--bold")
+      //    .innerText.trim()
+      //    .toLowerCase();
+      // const sizes = [];
+
+      // Array.from(items).forEach((items) => {
+      //    sizes.push(items.innerText.trim().toLowerCase());
+      // });
+
+      const other_attributes = wrapper.querySelectorAll('[class*="-variant-wrapper"]');
+      const data = [];
+
+      for (let index = 0; index < other_attributes.length; index++) {
+         const other_attribute = other_attributes[index];
+
+         const other_attribute_content = other_attribute.innerText;
+
+         if (other_attribute_content === "") {
+            continue;
+         }
+
+         // Extract items
+         const attribute_items = [];
+         Array.from(other_attribute.querySelectorAll(".sp-itm:not(.so)")).forEach(item => {
+            attribute_items.push(item.innerText.trim().toLowerCase());
+         })
+
+         // Extract title
+         const attribute_title = other_attribute
+            .querySelector("[class*='-variant-title--bold']")
+            .innerText.replaceAll(":", "")
+            .trim()
+            .toLowerCase();
+
+         data.push({
+            title: attribute_title,
+            data: attribute_items,
+         });
+      }
+
+      return data;
+   }
+
    /**
     * Evaluate and extract current product brand form details container
     *
@@ -203,18 +250,18 @@ class Evaluate {
       const product_button_container = document.querySelector('.product-button-container');
       const sold_out_button = product_button_container.querySelector('.sold-out');
       const add_to_basket_button = product_button_container.querySelector('.add-to-basket');
-      
-      if(add_to_basket_button) {
+
+      if (add_to_basket_button) {
          return [product_button_container, add_to_basket_button, sold_out_button];
          return true;
       }
-      
+
       // If button is available in product_button_container,
       // this product is sold out so return false
-      if(sold_out_button === undefined) {
+      if (sold_out_button === undefined) {
          return false;
       }
-      
+
       return true;
    }
 }

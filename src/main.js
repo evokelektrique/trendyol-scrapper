@@ -264,7 +264,7 @@ const fastSyncWorker = new Worker(
                type: "link",
                uuid: job.data.uuid,
                url: job.data.url,
-               variation_id: job.data.variation_id,
+               variation_combination_id: job.data.variation_combination_id,
                target_link_titles: job.data.target_link_titles,
                product: product,
             },
@@ -278,7 +278,7 @@ const fastSyncWorker = new Worker(
                type: "link",
                uuid: job.data.uuid,
                url: job.data.url,
-               variation_id: job.data.variation_id,
+               variation_combination_id: job.data.variation_combination_id,
                target_link_titles: job.data.target_link_titles,
                product: [],
             },
@@ -427,14 +427,14 @@ app.post(
          url: req.body.url,
          uuid: req.body.uuid,
          target_link_titles: req.body.target_link_titles,
-         variation_id: req.body.variation_id,
+         variation_combination_id: req.body.variation_combination_id,
       });
 
       logger.debug(JSON.stringify({
          url: req.body.url,
          uuid: req.body.uuid,
          target_link_titles: req.body.target_link_titles,
-         variation_id: req.body.variation_id,
+         variation_combination_id: req.body.variation_combination_id,
       }));
 
       const data = {

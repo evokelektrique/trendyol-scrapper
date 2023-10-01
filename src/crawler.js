@@ -306,8 +306,39 @@ class Crawler {
     */
    static async extract_product_variations(page, is_fast = false, target_link_titles = []) {
       const extracted_attributes = await this.extract_product_attritubtes(page);
+      logger.debug('extracted_attributes ' + JSON.stringify(extracted_attributes));
+
       const attribute_titles = extracted_attributes.attribute_titles;
       const variations = [];
+
+      // Empty attribute titles, we need to check for other attributes
+      if (attribute_titles.length === 0) {
+         const attributes = {}; // It's fine, the other loop won't even hit to get an error for this constant
+
+         const other_attributes = await page.evaluate(Evaluate.evaluate_extract_product_other_variants);
+         other_attributes.forEach(other_attribute => {
+            attributes[other_attribute.title.toLowerCase()] = other_attribute.data;
+         })
+         logger.debug('other_attributes ' + JSON.stringify(other_attributes));
+
+         const is_available = await this.get_product_availability(page);
+         const images = await page.evaluate(Evaluate.evaluate_extract_product_images);
+         const price = await page.evaluate(Evaluate.evaluate_extract_product_price);
+
+         if (parseCurrency(price.regular)) {
+            price.regular = parseCurrency(price.regular).value;
+         }
+         if (parseCurrency(price.featured)) {
+            price.featured = parseCurrency(price.featured).value;
+         }
+
+         variations.push({
+            attributes: attributes,
+            images: images,
+            price: price,
+            is_available: is_available,
+         });
+      }
 
       for (let index = 0; index < attribute_titles.length; index++) {
          const title = attribute_titles[index];
@@ -318,29 +349,34 @@ class Crawler {
                const link = attribute_links[index];
                const attributes = {};
                const link_class_names = (await link.getProperty("className")).toString();
+               const target_link_class_names = "selected";
 
+               // Click on each attribute link
                try {
-                  if (!link_class_names.includes("selected")) {
-                     logger.debug(`Skipping attribute link with title (${await link.getProperty("title")}), because it contains (${link_class_names}) class names`);
+                  if (!link_class_names.includes(target_link_class_names)) {
                      await link.click();
+                  } else {
+                     logger.debug(`Skipping attribute link with title (${await link.getProperty("title")}), because it contains (${link_class_names}) class names`);
                   }
                } catch (e) {
                   logger.error(`Skipped error: ${e}`);
                   continue;
                }
 
+               // Wait for 3 seconds
                await new Promise((resolve) => setTimeout(resolve, 3000));
-               const is_available = await this.get_product_availability(page);
 
-               const linkTitle = (await link.getProperty("title")).toString().replace("JSHandle:", "");
+               const linkTitle = (await link.getProperty("title")).toString().replace("JSHandle:", "").toLowerCase();
                attributes[title] = linkTitle;
+               logger.debug('Added a new title(' + title + ') to attributes:' + linkTitle);
 
-               const is_attribute_available_size = await page.evaluate(Evaluate.evaluate_is_attribute_available_size);
-               if (is_attribute_available_size) {
-                  const attributes_sizes = await page.evaluate(Evaluate.evaluate_extract_product_size_variants);
-                  attributes[attributes_sizes.title] = attributes_sizes.data;
-               }
+               const other_attributes = await page.evaluate(Evaluate.evaluate_extract_product_other_variants);
+               other_attributes.forEach(other_attribute => {
+                  attributes[other_attribute.title.toLowerCase()] = other_attribute.data;
+               })
+               logger.debug('other_attributes ' + JSON.stringify(other_attributes));
 
+               const is_available = await this.get_product_availability(page);
                const images = await page.evaluate(Evaluate.evaluate_extract_product_images);
                const price = await page.evaluate(Evaluate.evaluate_extract_product_price);
 
@@ -390,8 +426,9 @@ class Crawler {
 
                   try {
                      if (!link_class_names.includes("selected")) {
-                        logger.debug(`Skipping attribute link with title (${await link.getProperty("title")}), because it contains (${link_class_names}) class names`);
                         await link.click();
+                     } else {
+                        logger.debug(`Skipping attribute link with title (${await link.getProperty("title")}), because it contains (${link_class_names}) class names`);
                      }
                   } catch (e) {
                      logger.error(`Skipped error: ${e}`);
@@ -470,7 +507,6 @@ class Crawler {
       const attributes_wrappers = await wrapper.$$(
          ".slicing-attributes section"
       );
-      const other_attributes = await wrapper.$$('[class*="-variant-wrapper"]');
 
       for (let index = 0; index < attributes_wrappers.length; index++) {
          const attributes_wrapper = attributes_wrappers[index];
@@ -489,30 +525,6 @@ class Crawler {
          // Extract title
          const attribute_title = await attributes_wrapper.$eval(
             ".slc-title",
-            (title) => title.innerText.replaceAll(":", "").trim().toLowerCase()
-         );
-
-         data.attribute_titles.push(attribute_title);
-         data.attributes[attribute_title] = attribute_links;
-      }
-
-      for (let index = 0; index < other_attributes.length; index++) {
-         const other_attribute = other_attributes[index];
-
-         const other_attribute_content = await other_attribute.evaluate(
-            (e) => e.innerText
-         );
-
-         if (other_attribute_content === "") {
-            continue;
-         }
-
-         // Extract variation links
-         const attribute_links = await other_attribute.$$(".sp-itm:not(.so)");
-
-         // Extract title
-         const attribute_title = await other_attribute.$eval(
-            "[class*='-variant-title--bold']",
             (title) => title.innerText.replaceAll(":", "").trim().toLowerCase()
          );
 
