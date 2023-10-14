@@ -5,7 +5,6 @@ dotenv.config();
 const axios = require("axios");
 
 // const tracer = require("./tracer")("node_trendyol_scrapper");
-const Crawler = require("./crawler.js");
 
 // Express
 const express = require("express");
@@ -31,7 +30,7 @@ const plugin_path = path.resolve("./plugin/js/config_ac_api_key.js"); // Convert
 const apiKey = process.env.RECAPTCHA_API;
 // Set api key
 if (!fs.existsSync(plugin_path)) {
-   return "Plugin path not found";
+   console.log("Plugin path not found");
 }
 let confData = fs.readFileSync(plugin_path, "utf8");
 confData = confData.replace(
@@ -45,274 +44,18 @@ const { Worker, Queue, QueueEvents, Job } = require("bullmq");
 const { createBullBoard } = require("@bull-board/api");
 const { BullMQAdapter } = require("@bull-board/api/bullMQAdapter");
 const { ExpressAdapter } = require("@bull-board/express");
+const { FastSyncQueueInstance } = require("./queues/fastSyncQueueInstance.js");
+const { ExtractLinkQueueInstance } = require("./queues/extractLinkQueueInstance.js");
+const { ExtractArchiveQueueInstance } = require("./queues/exctractArchiveQueueInstance.js");
 
-const queue_options = {
-   defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-         type: "exponential",
-         delay: 1000,
-      },
-   },
-   connection: {
-      host: process.env.REDIS_HOST,
-      port: process.env.REDIS_PORT,
-      password: process.env.REDIS_PASSWORD,
-   },
-};
+const extractArchiveQueueInstance = new ExtractArchiveQueueInstance();
+const extractArchiveQueue = extractArchiveQueueInstance.queue;
 
-const worker_options = {
-   connection: {
-      host: process.env.REDIS_HOST,
-      port: process.env.REDIS_PORT,
-      password: process.env.REDIS_PASSWORD,
-   },
-   limiter: {
-      max: 10,
-      duration: 60000,
-   },
-};
+const extractLinkQueueInstance = new ExtractLinkQueueInstance();
+const extractLinkQueue = extractLinkQueueInstance.queue;
 
-// Create a new connection in every instance
-const extractLinkQueue = new Queue("extract_link_queue", queue_options);
-const extractLinkQueueEvents = new QueueEvents(
-   "extract_link_queue",
-   queue_options
-);
-const extractLinkWorker = new Worker(
-   "extract_link_queue",
-   async (job) => {
-      let data;
-
-      try {
-         const page = await Crawler.launch_browser();
-         const product = await Crawler.load_product_page(page, job.data.url);
-         await page.close();
-         logger.info("Browser closed");
-
-         data = {
-            status: "success",
-            data: {
-               type: "link",
-               uuid: job.data.uuid,
-               url: job.data.url,
-               product: product,
-            },
-         };
-      } catch (error) {
-         logger.info("Error " + error.message);
-
-         data = {
-            status: "failed",
-            data: {
-               type: "link",
-               uuid: job.data.uuid,
-               url: job.data.url,
-               product: [],
-            },
-         };
-
-         // await job.moveToFailed(e, token, false);
-      }
-
-      return data;
-   },
-   worker_options
-);
-extractLinkQueueEvents.on("completed", async ({ jobId }) => {
-   logger.info("JOB COMPLETED " + jobId);
-   const job = await Job.fromId(extractLinkQueue, jobId);
-   const data = job.returnvalue;
-
-   const url = process.env.KE_BASE_API_URL + "/link/store";
-   const privateKey = process.env.KE_API_KEY; // Replace with your actual private API key
-   const config = {
-      headers: {
-         PRIVATE_API_KEY: privateKey,
-         "Content-Type": "application/json", // You can also include other headers here
-      },
-   };
-   logger.info(`Request POST: url(${url})`);
-   logger.info(`Request POST: url(${url}) - ` + JSON.stringify(data));
-   try {
-      const response = await axios.post(url, data, config);
-      logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
-   } catch (error) {
-      logger.error("Error: " + error.message);
-   }
-});
-
-const extractArchiveQueue = new Queue("extract_archive_queue", queue_options);
-const extractArchiveQueueEvents = new QueueEvents(
-   "extract_archive_queue",
-   queue_options
-);
-const extractArchiveWorker = new Worker(
-   "extract_archive_queue",
-   async (job) => {
-      let data;
-
-      try {
-         const page = await Crawler.launch_browser();
-         const urls = job.data.urls;
-
-         /**
-          * Extract links
-          */
-         const limit = 200;
-         let extracted_links = [];
-         for (let i = 0; i < urls.length; i++) {
-            // Add most recent products to url
-            const url = new URL(urls[i]);
-            url.searchParams.append("sst", "MOST_RECENT");
-
-            // Crawl it
-            const links = await Crawler.load_archive_page(
-               page,
-               url.href,
-               limit
-            );
-            extracted_links.push(links);
-         }
-
-         // Flatten links array
-         extracted_links = extracted_links.flat(Infinity);
-         const base_url = "https://www.trendyol.com";
-         const linksWithBaseUrl = extracted_links.map(
-            (link) => new URL(link, base_url).href
-         );
-
-         logger.debug(`Extracted links (${linksWithBaseUrl.length}) total`);
-
-         // Close current page when the process is finished
-         await page.close();
-         logger.info("Browser closed");
-
-         data = {
-            status: "success",
-            data: {
-               type: "archive",
-               uuid: job.data.uuid,
-               url: urls[0],
-               links: linksWithBaseUrl,
-            },
-         };
-      } catch (error) {
-         logger.info("Error " + error.message);
-
-         data = {
-            status: "failed",
-            data: {
-               type: "archive",
-               uuid: job.data.uuid,
-               url: urls[0],
-               links: [],
-            },
-         };
-
-         // await job.moveToFailed(e, token, false);
-      }
-
-      return data;
-   },
-   worker_options
-);
-
-extractArchiveQueueEvents.on("completed", async ({ jobId }) => {
-   logger.info("JOB COMPLETED " + jobId);
-   const job = await Job.fromId(extractArchiveQueue, jobId);
-   const data = job.returnvalue;
-
-   const url = process.env.KE_BASE_API_URL + "/link/store";
-   const privateKey = process.env.KE_API_KEY; // Replace with your actual private API key
-   const config = {
-      headers: {
-         PRIVATE_API_KEY: privateKey,
-         "Content-Type": "application/json", // You can also include other headers here
-      },
-   };
-   logger.info(`Request POST: url(${url}) - ` + JSON.stringify(data));
-   try {
-      const response = await axios.post(url, data, config);
-      logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
-   } catch (error) {
-      logger.error("Error: " + error.message);
-   }
-});
-
-const fastSyncQueue = new Queue("fast_sync_queue", queue_options);
-const fastSyncQueueEvents = new QueueEvents(
-   "fast_sync_queue",
-   queue_options
-);
-const fastSyncWorker = new Worker(
-   "fast_sync_queue",
-   async (job) => {
-      let data;
-
-      try {
-         const page = await Crawler.launch_browser();
-         const product = await Crawler.load_product_page_fast(page, job.data.url, job.data.target_link_titles);
-
-         // Close current page when the process is finished
-         await page.close();
-         logger.info("Browser closed");
-
-         data = {
-            status: "success",
-            data: {
-               type: "link",
-               uuid: job.data.uuid,
-               url: job.data.url,
-               variation_combination_id: job.data.variation_combination_id,
-               target_link_titles: job.data.target_link_titles,
-               product: product,
-            },
-         };
-      } catch (error) {
-         logger.info("Error " + error.message);
-
-         data = {
-            status: "failed",
-            data: {
-               type: "link",
-               uuid: job.data.uuid,
-               url: job.data.url,
-               variation_combination_id: job.data.variation_combination_id,
-               target_link_titles: job.data.target_link_titles,
-               product: [],
-            },
-         };
-
-         // await job.moveToFailed(e, token, false);
-      }
-
-      return data;
-   },
-   worker_options
-);
-
-fastSyncQueueEvents.on("completed", async ({ jobId }) => {
-   logger.info("JOB COMPLETED " + jobId);
-   const job = await Job.fromId(fastSyncQueue, jobId);
-   const data = job.returnvalue;
-
-   const url = process.env.KE_BASE_API_URL + "/link/fast_store";
-   const privateKey = process.env.KE_API_KEY; // Replace with your actual private API key
-   const config = {
-      headers: {
-         PRIVATE_API_KEY: privateKey,
-         "Content-Type": "application/json", // You can also include other headers here
-      },
-   };
-   logger.info(`Request POST: url(${url}) - ` + JSON.stringify(data));
-   try {
-      const response = await axios.post(url, data, config);
-      logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
-   } catch (error) {
-      logger.error("Error: " + error.message);
-   }
-});
+const fastSyncQueueInstance = new FastSyncQueueInstance();
+const fastSyncQueue = fastSyncQueueInstance.queue;
 
 const serverAdapter = new ExpressAdapter();
 const bullBoard = createBullBoard({
