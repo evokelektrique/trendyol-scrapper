@@ -1,34 +1,45 @@
 {
-  "name": "trendyol-scrapper",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/main.js"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@bull-board/express": "^5.8.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.38.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.41.2",
-    "@opentelemetry/sdk-node": "^0.41.2",
-    "axios": "^1.5.0",
-    "bullmq": "^4.8.0",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "express-async-errors": "^3.1.1",
-    "express-async-handler": "^1.2.0",
-    "http-errors": "^2.0.0",
-    "parsecurrency": "^1.1.0",
-    "puppeteer": "^20.8.2",
-    "puppeteer-cluster": "^0.23.0",
-    "puppeteer-core": "^20.9.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-adblocker": "^2.13.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "winston": "^3.10.0",
-    "winston-daily-rotate-file": "^4.7.1"
-  }
+   "name": "trendyol-scrapper",
+   "version": "1.0.0",
+   "description": "",
+   "main": "index.js",
+   "scripts": {
+      "dev": "concurrently \"npm run watch-compile\" \"npm run watch-dev\"",
+      "watch-compile": "swc src -w --out-dir dist",
+      "watch-dev": "nodemon --watch \"dist/**/*\" -e js ./dist/main.js",
+      "build": "swc src -d dist",
+      "start": "NODE_ENV=production node dist/main.js",
+      "clean": "rm -rf dist"
+   },
+   "author": "",
+   "license": "ISC",
+   "dependencies": {
+      "@bull-board/express": "^5.8.0",
+      "@opentelemetry/auto-instrumentations-node": "^0.38.0",
+      "@opentelemetry/exporter-trace-otlp-http": "^0.41.2",
+      "@opentelemetry/sdk-node": "^0.41.2",
+      "axios": "^1.5.0",
+      "bullmq": "^4.8.0",
+      "chokidar": "^3.5.3",
+      "concurrently": "^8.2.1",
+      "dotenv": "^16.3.1",
+      "express": "^4.18.2",
+      "express-async-errors": "^3.1.1",
+      "express-async-handler": "^1.2.0",
+      "http-errors": "^2.0.0",
+      "nodemon": "^3.0.1",
+      "parsecurrency": "^1.1.0",
+      "puppeteer": "^20.8.2",
+      "puppeteer-cluster": "^0.23.0",
+      "puppeteer-core": "^20.9.0",
+      "puppeteer-extra": "^3.3.6",
+      "puppeteer-extra-plugin-adblocker": "^2.13.6",
+      "puppeteer-extra-plugin-stealth": "^2.11.2",
+      "winston": "^3.10.0",
+      "winston-daily-rotate-file": "^4.7.1"
+   },
+   "devDependencies": {
+      "@swc/cli": "^0.1.62",
+      "@swc/core": "^1.3.91"
+   }
 }
