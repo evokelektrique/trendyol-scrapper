@@ -25,10 +25,6 @@ class ExtractArchiveQueueInstance {
          },
          concurrency: 3,
          useWorkerThreads: true,
-         limiter: {
-            max: 3,
-            duration: 60000,
-         },
       };
 
       // Queue
