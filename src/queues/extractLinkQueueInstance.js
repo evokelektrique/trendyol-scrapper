@@ -23,7 +23,7 @@ class ExtractLinkQueueInstance {
             port: process.env.REDIS_PORT,
             password: process.env.REDIS_PASSWORD,
          },
-         concurrency: 3,
+         concurrency: 5,
          useWorkerThreads: true,
       };
 

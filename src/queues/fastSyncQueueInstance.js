@@ -23,7 +23,7 @@ class FastSyncQueueInstance {
             port: process.env.REDIS_PORT,
             password: process.env.REDIS_PASSWORD,
          },
-         concurrency: 3,
+         concurrency: 10,
          useWorkerThreads: true,
       };
 
@@ -34,7 +34,7 @@ class FastSyncQueueInstance {
       this.queueEvents = new QueueEvents("fast_sync_queue", this.queue_options);
 
       // Worker
-      const jobFile = path.join(__dirname, '../jobs/fastSyncJob.js');
+      const jobFile = path.join(__dirname, '../jobs/extractLinkJob.js');
       this.worker = new Worker("fast_sync_queue", jobFile, this.worker_options);
       
       // Queue events
@@ -43,7 +43,8 @@ class FastSyncQueueInstance {
          const job = await Job.fromId(this.queue, jobId);
          const data = job.returnvalue;
       
-         const url = process.env.KE_BASE_API_URL + "/link/fast_store";
+         // const url = process.env.KE_BASE_API_URL + "/link/fast_store";
+         const url = process.env.KE_BASE_API_URL + "/link/store";
          const privateKey = process.env.KE_API_KEY;
          const config = {
             headers: {
