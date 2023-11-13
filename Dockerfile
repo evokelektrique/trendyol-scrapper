@@ -10,6 +10,7 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY package*.json ./
 
+RUN npm config set registry https://registry.npmjs.org/
 RUN npm install
 
 # Bundle app source
