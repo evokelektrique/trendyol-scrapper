@@ -8,7 +8,7 @@
       "watch-compile": "swc src -w --out-dir dist",
       "watch-dev": "nodemon --watch \"dist/**/*\" -e js ./dist/main.js",
       "build": "swc src -d dist",
-      "start": "NODE_ENV=production node dist/main.js",
+      "start": "NODE_ENV=production node src/main.js",
       "clean": "rm -rf dist"
    },
    "author": "",
