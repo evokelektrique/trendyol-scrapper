@@ -36,7 +36,8 @@
       "puppeteer-extra-plugin-adblocker": "^2.13.6",
       "puppeteer-extra-plugin-stealth": "^2.11.2",
       "winston": "^3.10.0",
-      "winston-daily-rotate-file": "^4.7.1"
+      "winston-daily-rotate-file": "^4.7.1",
+      "winston-gelf": "^1.7.0"
    },
    "devDependencies": {
       "@swc/cli": "^0.1.62",

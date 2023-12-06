@@ -192,7 +192,6 @@ app.post(
 
 // Error handling middleware
 app.use((error, req, res, next) => {
-   console.log(error);
    logger.error(error);
 
    // Handle known errors
@@ -212,5 +211,5 @@ app.use((error, req, res, next) => {
 
 // Start the server
 const server = app.listen(server_port, server_host, async () => {
-   console.log(`App is listening on port ${server_port}`);
+   logger.info(`App is listening on port ${server_port}`);
 });
