@@ -4,6 +4,8 @@ const constant = require("./constant.js");
 const global_args = require("./args.js");
 const { executablePath } = require("puppeteer");
 const parseCurrency = require("parsecurrency");
+const url = require('url');
+const process = require('process');
 
 // Puppeteer
 const puppeteer = require("puppeteer-core");
@@ -134,6 +136,24 @@ class Crawler {
       return data;
    }
 
+   static extractProductId(productUrl) {
+      try {
+         const parsedUrl = new URL(productUrl);
+         const pathSegments = parsedUrl.pathname.split('/');
+         const lastPathSegment = pathSegments[pathSegments.length - 1];
+         const match = lastPathSegment.match(/p-(\d+)/);
+
+         if (match && match[1]) {
+            return match[1];
+         } else {
+            throw new Error('Product ID not found in the URL');
+         }
+      } catch (error) {
+         logger.error('Error extracting product ID: ' + error.message);
+         return null;
+      }
+   }
+
    /**
     * Fetch single product page
     *
@@ -151,11 +171,14 @@ class Crawler {
          price: null,
          currency_code: constant.currency.tr.code,
          variations: [],
-         recent_reviews: [],
+         reviews: [],
          properties: [],
          images: [],
          is_available: false,
       };
+
+      // Fetch reviews
+      data.reviews = await this.load_reviews(url);
 
       logger.info("Opening " + url);
 
@@ -255,6 +278,86 @@ class Crawler {
       }
 
       return data;
+   }
+
+   /**
+    * Fetch product reviews
+    * 
+    * @param {Object} page 
+    * @param {String} url 
+    */
+   static async load_reviews(url) {
+      try {
+         const productId = this.extractProductId(url);
+         const apiUrl = `https://public-mdc.trendyol.com/discovery-web-socialgw-service/api/review/${productId}?pageSize=50&page=0`
+         logger.debug(`Fetching productId(${productId}) with apiURL(${apiUrl})`);
+         const response = await fetch(apiUrl);
+         const data = await response.json();
+
+         // Check if the request was successful
+         if (response.ok) {
+            logger.debug(`Fetching respose is ok(${response.ok})`);
+         } else {
+            throw new Error(`Request failed with status: ${response.status}`);
+         }
+
+         const totalPages = data.result.productReviews.totalPages;
+
+         // Process content if totalPages is available
+         if (totalPages) {
+
+            const reviews = [];
+
+            // Fetch content from each page
+            for (let page = 0; page < totalPages; page++) {
+               const pageUrl = `${apiUrl}&pageSize=50&page=${page}`;
+               const pageResponse = await fetch(pageUrl);
+               const pageData = await pageResponse.json();
+
+               // Process content for each page
+               const content = pageData.result.productReviews.content;
+               if (content) {
+                  const parsedContent = content.map(this.extractContentInformation);
+                  reviews.push(parsedContent);
+               }
+            }
+
+            logger.debug(`Reviews(${reviews.length}) added`);
+            return reviews;
+         } else {
+            throw new Error('Total pages information not available in the response.');
+         }
+      } catch (error) {
+         logger.error('Error fetching data:' + error.message);
+
+         return [];
+      }
+   }
+
+   /**
+    * Extract information from a content item.
+    *
+    * @param {Object} content - The content item object.
+    * @returns {Object} - Extracted information, including media file details if available.
+   */
+   static extractContentInformation(content) {
+      const mediaFiles = content.mediaFiles || [];
+
+      // Check if mediaFiles is not empty
+      const firstMediaFile = mediaFiles.length > 0 ? mediaFiles[0] : null;
+
+      // Extract properties of the first media file
+      const mediaFile = firstMediaFile ? firstMediaFile.url : null;
+
+      // Return the extracted information
+      return {
+         commentDate: content.commentDateISOtype,
+         userFullName: content.userFullName,
+         rating: content.rate,
+         commentTitle: content.commentTitle,
+         commentText: content.comment,
+         mediaFile,
+      };
    }
 
    /**

@@ -2,8 +2,6 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
-const axios = require("axios");
-
 // const tracer = require("./tracer")("node_trendyol_scrapper");
 
 // Express
