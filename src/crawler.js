@@ -289,7 +289,8 @@ class Crawler {
    static async load_reviews(url) {
       try {
          const productId = this.extractProductId(url);
-         const apiUrl = `https://public-mdc.trendyol.com/discovery-web-socialgw-service/api/review/${productId}?pageSize=50&page=0`
+         const apiBaseUrl = `https://public-mdc.trendyol.com/discovery-web-socialgw-service/api/review/${productId}`;
+         const apiUrl = apiBaseUrl + `?pageSize=50&page=0`
          logger.debug(`Fetching productId(${productId}) with apiURL(${apiUrl})`);
          const response = await fetch(apiUrl);
          const data = await response.json();
@@ -310,7 +311,8 @@ class Crawler {
 
             // Fetch content from each page
             for (let page = 0; page < totalPages; page++) {
-               const pageUrl = `${apiUrl}&pageSize=50&page=${page}`;
+               const pageUrl = `${apiBaseUrl}?pageSize=50&page=${page}`;
+               logger.debug(`Fetching page url(${pageUrl})`);
                const pageResponse = await fetch(pageUrl);
                const pageData = await pageResponse.json();
 
@@ -318,7 +320,7 @@ class Crawler {
                const content = pageData.result.productReviews.content;
                if (content) {
                   const parsedContent = content.map(this.extractContentInformation);
-                  reviews.push(parsedContent);
+                  reviews.push(...parsedContent);
                }
             }
 
@@ -339,24 +341,16 @@ class Crawler {
     *
     * @param {Object} content - The content item object.
     * @returns {Object} - Extracted information, including media file details if available.
-   */
+    */
    static extractContentInformation(content) {
       const mediaFiles = content.mediaFiles || [];
 
-      // Check if mediaFiles is not empty
-      const firstMediaFile = mediaFiles.length > 0 ? mediaFiles[0] : null;
-
-      // Extract properties of the first media file
-      const mediaFile = firstMediaFile ? firstMediaFile.url : null;
-
       // Return the extracted information
       return {
-         commentDate: content.commentDateISOtype,
          userFullName: content.userFullName,
          rating: content.rate,
-         commentTitle: content.commentTitle,
          commentText: content.comment,
-         mediaFile,
+         mediaFiles: mediaFiles.map(file => file.url), // Extract all media file URLs
       };
    }
 

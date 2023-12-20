@@ -45,6 +45,10 @@ const { ExpressAdapter } = require("@bull-board/express");
 const { FastSyncQueueInstance } = require("./queues/fastSyncQueueInstance.js");
 const { ExtractLinkQueueInstance } = require("./queues/extractLinkQueueInstance.js");
 const { ExtractArchiveQueueInstance } = require("./queues/exctractArchiveQueueInstance.js");
+const { ExtractReviewsQueueInstance } = require("./queues/exctractReviewsQueueInstance.js");
+
+const extractReviewsQueueInstance = new ExtractReviewsQueueInstance();
+const extractReviewsQueue = extractReviewsQueueInstance.queue;
 
 const extractArchiveQueueInstance = new ExtractArchiveQueueInstance();
 const extractArchiveQueue = extractArchiveQueueInstance.queue;
@@ -58,6 +62,7 @@ const fastSyncQueue = fastSyncQueueInstance.queue;
 const serverAdapter = new ExpressAdapter();
 const bullBoard = createBullBoard({
    queues: [
+      new BullMQAdapter(extractReviewsQueue),
       new BullMQAdapter(extractArchiveQueue),
       new BullMQAdapter(extractLinkQueue),
       new BullMQAdapter(fastSyncQueue),
@@ -171,12 +176,29 @@ app.post(
          variation_combination_id: req.body.variation_combination_id,
       });
 
-      logger.debug(JSON.stringify({
+      const data = {
+         status: "in_queue",
+         data: [],
+      };
+
+      res.json(data);
+      logger.debug(`Send response`);
+   })
+);
+
+/**
+ * /extract_reviews
+ */
+app.post(
+   "/fast_sync",
+   asyncHandler(async (req, res, next) => {
+      if (!req.body.url) {
+         throw createError(422, "url not defined");
+      }
+
+      extractReviewsQueue.add("extract_reviews_queue", {
          url: req.body.url,
-         uuid: req.body.uuid,
-         target_link_titles: req.body.target_link_titles,
-         variation_combination_id: req.body.variation_combination_id,
-      }));
+      });
 
       const data = {
          status: "in_queue",
