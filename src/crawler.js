@@ -177,8 +177,8 @@ class Crawler {
          is_available: false,
       };
 
-      // Fetch reviews
-      data.reviews = await this.load_reviews(url);
+      // // Fetch reviews
+      // data.reviews = await this.load_reviews(url);
 
       logger.info("Opening " + url);
 
