@@ -8,6 +8,7 @@ module.exports = async (job) => {
 
    try {
       const url = job.data.url;
+      const product_id = job.data.product_id;
       const reviews = await Crawler.load_reviews(url);
       logger.info("Reviews fetched");
 
@@ -16,6 +17,8 @@ module.exports = async (job) => {
          data: {
             type: "product_review",
             reviews: reviews,
+            product_id: product_id,
+            url: url,
          },
       };
    } catch (error) {
@@ -26,6 +29,8 @@ module.exports = async (job) => {
          data: {
             type: "product_review",
             reviews: [],
+            product_id: product_id,
+            url: url,
          },
       };
    }

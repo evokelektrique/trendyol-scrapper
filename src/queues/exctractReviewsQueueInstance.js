@@ -56,7 +56,7 @@ class ExtractReviewsQueueInstance {
             const response = await axios.post(url, data, config);
             logger.info(`Response: url(${url}) - ` + JSON.stringify(response.data));
          } catch (error) {
-            logger.error("Error: " + error.message);
+            logger.error(error);
          }
       });
    }

@@ -62,9 +62,9 @@ const fastSyncQueue = fastSyncQueueInstance.queue;
 const serverAdapter = new ExpressAdapter();
 const bullBoard = createBullBoard({
    queues: [
-      new BullMQAdapter(extractReviewsQueue),
       new BullMQAdapter(extractArchiveQueue),
       new BullMQAdapter(extractLinkQueue),
+      new BullMQAdapter(extractReviewsQueue),
       new BullMQAdapter(fastSyncQueue),
    ],
    serverAdapter: serverAdapter,
@@ -190,7 +190,7 @@ app.post(
  * /extract_reviews
  */
 app.post(
-   "/fast_sync",
+   "/extract_reviews",
    asyncHandler(async (req, res, next) => {
       if (!req.body.url) {
          throw createError(422, "url not defined");
@@ -198,6 +198,7 @@ app.post(
 
       extractReviewsQueue.add("extract_reviews_queue", {
          url: req.body.url,
+         product_id: req.body.product_id,
       });
 
       const data = {

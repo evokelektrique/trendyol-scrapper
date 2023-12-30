@@ -30,7 +30,8 @@ const logger = createLogger({
       format.timestamp({ format: timezoned }),
       format.printf(({ timestamp, level, message }) => {
          return `${timestamp} [${level.toUpperCase()}]: ${message}`;
-      })
+      }),
+      format.errors({ stack: true }),
    ),
    transports: [
       // Log to the console if not in production
